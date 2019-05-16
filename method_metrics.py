@@ -1,4 +1,3 @@
-from pydriller.domain.commit import Modification
 from typing import List, Dict, Tuple
 
 
@@ -13,10 +12,10 @@ class MethodMetrics():
         src_lines = self.source.split('\n')
         return '\n'.join(src_lines[self.src_start - 1:self.src_stop])
 
-    def get_number_of_lines(self):
+    def get_number_of_lines(self) -> int:
         return len(self.source.split('\n'))
 
-    def get_add_lines(self, lines: Dict[str, List[Tuple[int, str]]]):
+    def get_add_lines(self, lines: Dict[str, List[Tuple[int, str]]]) -> int:
         count = 0
         added = lines['added']
         for a_line, a_text in added:
@@ -24,11 +23,10 @@ class MethodMetrics():
                 count += 1
         return count
 
-    def get_removed_lines(self, lines: Dict[str, List[Tuple[int, str]]]):
+    def get_removed_lines(self, lines: Dict[str, List[Tuple[int, str]]]) -> int:
         count = 0
         deleted = lines['deleted']
         for a_line, a_text in deleted:
             if self.src_start <= a_line <= self.src_stop:
                 count += 1
         return count
-
