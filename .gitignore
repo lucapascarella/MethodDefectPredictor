@@ -1,0 +1,7 @@
+# Method Defect Predictor
+
+# Ignore folders
+venv/
+__pycache__/
+
+# Ignore others
