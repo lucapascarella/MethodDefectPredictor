@@ -15,7 +15,7 @@ class MethodMetrics():
     def get_number_of_lines(self) -> int:
         return len(self.source.split('\n'))
 
-    def get_add_lines(self, lines: Dict[str, List[Tuple[int, str]]]) -> int:
+    def get_added_lines(self, lines: Dict[str, List[Tuple[int, str]]]) -> int:
         count = 0
         added = lines['added']
         for a_line, a_text in added:

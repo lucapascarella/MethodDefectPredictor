@@ -7,7 +7,7 @@ from method_metrics import MethodMetrics
 
 class Miner():
 
-    def __init__(self, repo_path: str, allowed_extensions: List[str], bic_commits: List = []):
+    def __init__(self, repo_path: str, allowed_extensions: List[str], bic_commits: List = [str]):
         if os.path.isdir(repo_path):
             self.repo_path = repo_path
             self.allowed_extensions = allowed_extensions
@@ -15,14 +15,14 @@ class Miner():
         else:
             print('The following path does not exist: ' + repo_path)
 
-    def get_methods(self, start_commit: str, stop_commit: str) -> Dict:
+    def get_methods(self, start_commit: str, stop_commit: str, filter_methods: List[str] = None) -> Dict[str, Dict]:
         methods = {}
         count = 0
         print('Mine: ' + self.repo_path)
         gr = GitRepository(self.repo_path)
-        for commit in RepositoryMining(self.repo_path, from_commit=start_commit, to_commit=stop_commit, reversed_order=True, only_modifications_with_file_types=self.allowed_extensions).traverse_commits():
+        for commit in RepositoryMining(self.repo_path, from_commit=stop_commit, to_commit=start_commit, reversed_order=True, only_modifications_with_file_types=self.allowed_extensions).traverse_commits():
             for mod in commit.modifications:
-                print(str(count) + ') Commit: ' + commit.hash + ' mod type: ' + str(mod.change_type))
+                print(str(count) + ') Commit: ' + commit.hash + ' date: ' + str(commit.committer_date) + ' type: ' + str(mod.change_type.name))
                 if mod.change_type is ModificationType.RENAME:
                     new_methods = {}
                     for key, value in methods.items():
@@ -34,37 +34,44 @@ class Miner():
                 if mod.change_type is not ModificationType.DELETE:
                     for method in mod.methods:
                         buggy = True if commit.hash in self.bic_commits else False
-                        lines = gr.parse_diff(mod.diff)  # From PyDriller
+                        lines = gr.parse_diff(mod.diff)
                         method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line)
                         process_metrics = {'hash': commit.hash, 'file': mod.new_path, 'method': method.name, 'change': mod.change_type,
                                            'file_count': len(commit.modifications), 'added': mod.added, 'removed': mod.removed,
                                            'loc': mod.nloc, 'comp': mod.complexity, 'token_count': mod.token_count, 'methods': len(mod.methods),
                                            'm_token': method.token_count, 'm_fan_in': method.fan_in, 'm_fan_out': method.fan_out, 'm_g_fan_out': method.general_fan_out,
                                            'm_loc': method.nloc, 'm_comp': method.complexity, 'm_length': method.length, 'm_param_count': method.parameters,
-                                           'source': method_metrics.get_method_source(), 'm_lines': method_metrics.get_number_of_lines(), 'm_added': method_metrics.get_add_lines(lines),
+                                           'source': method_metrics.get_method_source(), 'm_lines': method_metrics.get_number_of_lines(), 'm_added': method_metrics.get_added_lines(lines),
                                            'm_removed': method_metrics.get_removed_lines(lines),
                                            'author_email': commit.committer.email,
                                            'buggy': buggy}
                         key = mod.new_path + '$$' + method.name
-                        if key not in methods:
-                            methods[key] = []
-                        methods.get(key, []).append(process_metrics)
+
+                        if filter_methods is None or key in filter_methods:
+                            if key not in methods:
+                                methods[key] = []
+                            methods.get(key, []).append(process_metrics)
                 count += 1
         print()
         return methods
 
-    def get_methods_per_commit(self, commit_hash: str) -> List[str]:
+    def get_touched_methods_per_commit(self, commit_hash: str) -> List[str]:
         methods = []
         gr = GitRepository(self.repo_path)
         commit = gr.get_commit(commit_hash)
         for mod in commit.modifications:
             if mod.change_type is not ModificationType.DELETE:
                 for method in mod.methods:
-                    method_key = mod.new_path + '$$' + method.name
-                    methods.append(method_key)
+                    method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line)
+                    lines = gr.parse_diff(mod.diff)
+                    added = method_metrics.get_added_lines(lines)
+                    removed = method_metrics.get_removed_lines(lines)
+                    if added > 0 or removed > 0:
+                        method_key = mod.new_path + '$$' + method.name
+                        methods.append(method_key)
         return methods
 
-    def print_metrics_per_method(self, csv_path: str, methods: Dict):
+    def print_metrics_per_method(self, csv_path: str, methods: Dict[str, Dict]):
         print('Saving ' + str(len(methods)) + ' methods')
         output = open(csv_path, 'w')
         output.write('hash,key,file,method,changes,'
