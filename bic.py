@@ -13,7 +13,7 @@ def get_method_count(modifications):
 # Main
 if __name__ == '__main__':
     print("*** BIC started ***\n")
-
+    # python3 bic.py -r gecko-dev -i commit_results_1.csv -o bic_commit_results_1.csv
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--repo', type=str, help='Absolute GIT repository path', default='/Users/luca/TUProjects/Mozilla/gecko-dev')
     parser.add_argument('-i', '--input', type=str, help='Input CSV file with the list of fix commits', default='/Users/luca/TUProjects/Mozilla/commit_results.csv')
@@ -27,8 +27,8 @@ if __name__ == '__main__':
 
     gr = GitRepository(args.repo)
     fixes = csv.DictReader(open(args.input, 'r', newline='', encoding="utf-8"), delimiter=',')
+    count = 0
     for fix in fixes:
-        count = 0
         git_hash = fix['git_hash']
         fix_commit = gr.get_commit(git_hash)
         bic_commits = gr.get_commits_last_modified_lines(fix_commit)
@@ -48,7 +48,7 @@ if __name__ == '__main__':
             dout['bic_methods'] = get_method_count(bix_commit.modifications)
             dout['bic_timestamp'] = bix_commit.committer_date
             writer.writerow(dout)
-        count =+ 1
+        count += 1
         out_file.flush()
     out_file.close()
 
