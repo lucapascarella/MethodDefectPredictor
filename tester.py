@@ -2,6 +2,7 @@ import argparse, os
 from pydriller import GitRepository
 from pydriller.domain.commit import ModificationType
 from miner import Miner
+from tensorflow import keras
 
 # Main
 if __name__ == '__main__':
@@ -14,7 +15,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--commit', type=str, help='Commit HASH to analyze', default='89bc0cc12332ebc8359547c6ebf72fea5a65a74f')
     parser.add_argument('-p', '--stop', type=str, help='Stop HASH commit, if not specified it analyzes up to the end.', default=None)
     parser.add_argument('-o', '--output', type=str, help='Path of the CSV file where to save results.', default='testing_output.csv')
-    parser.add_argument('-m', '--model', type=str, help='Path of the machine learning model.', default='/Users/luca/PycharmProjects/MethodDefectPredictor/model.model')
+    parser.add_argument('-m', '--model', type=str, help='Path of the machine learning model.', default='model.h5')
     args, unknown = parser.parse_known_args()
 
     commit_hash = args.commit
@@ -33,5 +34,8 @@ if __name__ == '__main__':
     miner.print_metrics_per_method(args.output, metrics)
     print('Found metrics for ' + str(len(metrics)) + ' methods')
 
+    print('Load trained model: ' + model_path)
+    model = keras.models.load_model('my_model.h5')
+    model.summary()
 
     print("\n*** Tester ended ***")

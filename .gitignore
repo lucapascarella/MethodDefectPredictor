@@ -6,3 +6,4 @@ __pycache__/
 
 # Ignore others
 *.csv
+*.h5
