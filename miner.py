@@ -18,41 +18,42 @@ class Miner():
     def get_methods(self, start_commit: str, stop_commit: str, filter_methods: List[str] = None) -> Dict[str, Dict]:
         methods = {}
         count = 0
-        print('Mine: ' + self.repo_path)
+        print('Mining: ' + self.repo_path)
         gr = GitRepository(self.repo_path)
         for commit in RepositoryMining(self.repo_path, from_commit=stop_commit, to_commit=start_commit, reversed_order=True, only_modifications_with_file_types=self.allowed_extensions).traverse_commits():
             for mod in commit.modifications:
-                print(str(count) + ') Commit: ' + commit.hash + ' date: ' + str(commit.committer_date) + ' type: ' + str(mod.change_type.name))
-                if mod.change_type is ModificationType.RENAME:
-                    new_methods = {}
-                    for key, value in methods.items():
-                        old_path, method = key.split('$$')
-                        if old_path == mod.new_path:
-                            key = mod.old_path + '$$' + method
-                        new_methods[key] = value
-                    methods = new_methods
-                if mod.change_type is not ModificationType.DELETE:
-                    for method in mod.methods:
-                        buggy = True if commit.hash in self.bic_commits else False
-                        lines = gr.parse_diff(mod.diff)
-                        method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line)
-                        process_metrics = {'hash': commit.hash, 'file': mod.new_path, 'method': method.name, 'change': mod.change_type,
-                                           'file_count': len(commit.modifications), 'added': mod.added, 'removed': mod.removed,
-                                           'loc': mod.nloc, 'comp': mod.complexity, 'token_count': mod.token_count, 'methods': len(mod.methods),
-                                           'm_token': method.token_count, 'm_fan_in': method.fan_in, 'm_fan_out': method.fan_out, 'm_g_fan_out': method.general_fan_out,
-                                           'm_loc': method.nloc, 'm_comp': method.complexity, 'm_length': method.length, 'm_param_count': method.parameters,
-                                           'source': method_metrics.get_method_source(), 'm_lines': method_metrics.get_number_of_lines(), 'm_added': method_metrics.get_added_lines(lines),
-                                           'm_removed': method_metrics.get_removed_lines(lines),
-                                           'author_email': commit.committer.email,
-                                           'buggy': buggy}
-                        key = mod.new_path + '$$' + method.name
+                if mod.filename.endswith(tuple(self.allowed_extensions)):
+                    print('{:06}) Commit: {} Date: {} Type: {:6} File: {}'.format(count, commit.hash, commit.committer_date.strftime('%d/%m/%Y'), mod.change_type.name, mod.filename))
+                    if mod.change_type is ModificationType.RENAME:
+                        new_methods = {}
+                        for key, value in methods.items():
+                            old_path, method = key.split('$$')
+                            if old_path == mod.new_path:
+                                key = mod.old_path + '$$' + method
+                            new_methods[key] = value
+                        methods = new_methods
+                    if mod.change_type is not ModificationType.DELETE:
+                        for method in mod.methods:
+                            buggy = True if commit.hash in self.bic_commits else False
+                            lines = gr.parse_diff(mod.diff)
+                            method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line)
+                            process_metrics = {'hash': commit.hash, 'file': mod.new_path, 'method': method.name, 'change': mod.change_type,
+                                               'file_count': len(commit.modifications), 'added': mod.added, 'removed': mod.removed,
+                                               'loc': mod.nloc, 'comp': mod.complexity, 'token_count': mod.token_count, 'methods': len(mod.methods),
+                                               'm_token': method.token_count, 'm_fan_in': method.fan_in, 'm_fan_out': method.fan_out, 'm_g_fan_out': method.general_fan_out,
+                                               'm_loc': method.nloc, 'm_comp': method.complexity, 'm_length': method.length, 'm_param_count': method.parameters,
+                                               'source': method_metrics.get_method_source(), 'm_lines': method_metrics.get_number_of_lines(), 'm_added': method_metrics.get_added_lines(lines),
+                                               'm_removed': method_metrics.get_removed_lines(lines),
+                                               'author_email': commit.committer.email,
+                                               'buggy': buggy}
+                            key = mod.new_path + '$$' + method.name
 
-                        if filter_methods is None or key in filter_methods:
-                            if key not in methods:
-                                methods[key] = []
-                            methods.get(key, []).append(process_metrics)
-                count += 1
-        print()
+                            if filter_methods is None or key in filter_methods:
+                                if key not in methods:
+                                    methods[key] = []
+                                methods.get(key, []).append(process_metrics)
+                    count += 1
+        print('Mining ended')
         return methods
 
     def get_touched_methods_per_commit(self, commit_hash: str) -> List[str]:
