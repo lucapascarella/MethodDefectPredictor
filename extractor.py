@@ -37,6 +37,6 @@ if __name__ == '__main__':
 
     bic_commits = get_bic_commits(args.input, args.bic)
     miner = Miner(args.repo, args.ext, bic_commits)
-    methods = miner.get_methods(args.start, args.stop)
+    methods = miner.mine_methods(args.start, args.stop)
     miner.print_metrics_per_method(args.output, methods)
     print("\n*** Extractor ended ***")

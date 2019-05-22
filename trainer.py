@@ -4,7 +4,7 @@ if __name__ == '__main__':
     print("*** Trainer started ***\n")
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, help='Path of the CSV with training date.', default='extractor.csv')
-    parser.add_argument('-o', '--output', type=str, help='Path of the machine learning model.', default='model.model')
+    parser.add_argument('-o', '--output', type=str, help='Path of the machine learning model.', default='model.h5')
     args, unknown = parser.parse_known_args()
 
     header = 'hash,key,file,method,changes,' \
@@ -33,3 +33,5 @@ if __name__ == '__main__':
         for feature in features:
             d[feature] = row[feature]
         instances.append(d)
+
+    print("\n*** Trainer ended ***")

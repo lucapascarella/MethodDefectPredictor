@@ -1,11 +1,55 @@
-import argparse, csv, os
+import os
+import statistics as st
 from typing import List, Dict
 from pydriller import RepositoryMining, GitRepository
 from pydriller.domain.commit import ModificationType
 from method_metrics import MethodMetrics
 
 
-class Miner():
+class MinerBean:
+    def __init__(self, git_hash: str, file_name: str, method_name: str, change_type: ModificationType,
+                 file_count: int, file_added: int, file_removed: int, file_nloc: int, file_comp: int, file_token_count: int,
+                 method_count: int, method_added: int, method_removed: int, method_nlco: int, method_comp: int, method_token: int,
+                 method_number_of_lines: int, method_fan_in: int, method_fan_out: int, method_general_fan_out: int, method_parameters_count: int,
+                 author_email: str, buggy: bool):
+        self.git_hash = git_hash
+        self.file_name = file_name
+        self.method_name = method_name
+        self.change_type = change_type
+
+        self.file_count = file_count
+        self.file_added = file_added
+        self.file_removed = file_removed
+        self.file_nloc = file_nloc
+        self.file_comp = file_comp
+        self.file_token_count = file_token_count
+
+        self.method_count = method_count
+        self.method_added = method_added
+        self.method_removed = method_removed
+        self.method_nloc = method_nlco
+        self.method_comp = method_comp
+        self.method_token = method_token
+
+        self.method_number_of_lines = method_number_of_lines
+        self.method_fan_in = method_fan_in
+        self.method_fan_out = method_fan_out
+        self.method_general_fan_out = method_general_fan_out
+        self.method_parameters_count = method_parameters_count
+
+        self.author_email = author_email
+        self.buggy = buggy
+
+    @staticmethod
+    def retrieve_names():
+        return ['git_hash', 'file_name', 'method_name', 'change_type',
+                'file_count', 'file_added', 'file_removed', 'file_nloc', 'file_comp', 'file_token_count',
+                'method_count', 'method_added', 'method_removed', 'method_nlco', 'method_comp', 'method_token',
+                'method_number_of_lines', 'method_fan_in', 'method_fan_out', 'method_general_fan_out', 'method_parameters_count',
+                'author_email', 'buggy']
+
+
+class Miner:
 
     def __init__(self, repo_path: str, allowed_extensions: List[str], bic_commits: List = [str]):
         if os.path.isdir(repo_path):
@@ -15,15 +59,16 @@ class Miner():
         else:
             print('The following path does not exist: ' + repo_path)
 
-    def get_methods(self, start_commit: str, stop_commit: str, filter_methods: List[str] = None) -> Dict[str, Dict]:
+    def mine_methods(self, start_commit: str, stop_commit: str, filter_methods: List[str] = None) -> Dict[str, List[MinerBean]]:
         methods = {}
         count = 0
         print('Mining: ' + self.repo_path)
         gr = GitRepository(self.repo_path)
         for commit in RepositoryMining(self.repo_path, from_commit=stop_commit, to_commit=start_commit, reversed_order=True, only_modifications_with_file_types=self.allowed_extensions).traverse_commits():
+            print('{:06}) Commit: {} Date: {} Mods: {:}'.format(count, commit.hash, commit.committer_date.strftime('%d/%m/%Y'), len(commit.modifications)))
             for mod in commit.modifications:
                 if mod.filename.endswith(tuple(self.allowed_extensions)):
-                    print('{:06}) Commit: {} Date: {} Type: {:6} File: {}'.format(count, commit.hash, commit.committer_date.strftime('%d/%m/%Y'), mod.change_type.name, mod.filename))
+                    # print('{:06}) Commit: {} Date: {} Type: {:6} File: {}'.format(count, commit.hash, commit.committer_date.strftime('%d/%m/%Y'), mod.change_type.name, mod.filename))
                     if mod.change_type is ModificationType.RENAME:
                         new_methods = {}
                         for key, value in methods.items():
@@ -37,21 +82,18 @@ class Miner():
                             buggy = True if commit.hash in self.bic_commits else False
                             lines = gr.parse_diff(mod.diff)
                             method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line)
-                            process_metrics = {'hash': commit.hash, 'file': mod.new_path, 'method': method.name, 'change': mod.change_type,
-                                               'file_count': len(commit.modifications), 'added': mod.added, 'removed': mod.removed,
-                                               'loc': mod.nloc, 'comp': mod.complexity, 'token_count': mod.token_count, 'methods': len(mod.methods),
-                                               'm_token': method.token_count, 'm_fan_in': method.fan_in, 'm_fan_out': method.fan_out, 'm_g_fan_out': method.general_fan_out,
-                                               'm_loc': method.nloc, 'm_comp': method.complexity, 'm_length': method.length, 'm_param_count': method.parameters,
-                                               'source': method_metrics.get_method_source(), 'm_lines': method_metrics.get_number_of_lines(), 'm_added': method_metrics.get_added_lines(lines),
-                                               'm_removed': method_metrics.get_removed_lines(lines),
-                                               'author_email': commit.committer.email,
-                                               'buggy': buggy}
+                            mb = MinerBean(commit.hash, mod.new_path, method.name, mod.change_type,
+                                           len(commit.modifications), mod.added, mod.removed, mod.nloc, mod.complexity, mod.token_count,
+                                           len(mod.methods), method_metrics.get_added_lines(lines), method_metrics.get_removed_lines(lines), method.nloc, method.complexity, method.token_count,
+                                           method_metrics.get_number_of_lines(), method.fan_in, method.fan_out, method.general_fan_out, len(method.parameters),
+                                           commit.committer.email, buggy
+                                           )
                             key = mod.new_path + '$$' + method.name
 
                             if filter_methods is None or key in filter_methods:
                                 if key not in methods:
                                     methods[key] = []
-                                methods.get(key, []).append(process_metrics)
+                                methods.get(key, []).append(mb)
                     count += 1
         print('Mining ended')
         return methods
@@ -72,106 +114,233 @@ class Miner():
                         methods.append(method_key)
         return methods
 
-    def print_metrics_per_method(self, csv_path: str, methods: Dict[str, Dict]):
+    def print_metrics_per_method(self, csv_path: str, methods: Dict[str, List[MinerBean]]):
         print('Saving ' + str(len(methods)) + ' methods')
         output = open(csv_path, 'w')
-        output.write('hash,key,file,method,changes,'
-                     'file_count,max_file_count,avg_file_count,added,max_added,avg_added,'
-                     'removed,max_removed,avg_removed,'
-                     'loc,max_loc,avg_loc,'
-                     'complexity,max_complexity,avg_complexity,'
-                     'token_count,max_token_count,avg_token_count,'
-                     'methods,max_methods,avg_methods,'
-                     'm_token,max_m_token,avg_m_token,'
-                     'm_fan_in,m_fan_out,m_g_fan_out,'
-                     'm_loc,max_m_loc,avg_m_loc,'
-                     'm_length,max_m_length,avg_m_length,'
-                     'm_comp,max_m_comp,avg_m_comp,'
-                     'm_param_count,max_m_param_count,avg_m_param_count,'
-                     'm_added,max_m_added,avg_m_added,'
-                     'm_removed,max_m_removed,avg_m_removed,'
-                     'authors,'
-                     'bug_count,buggy\n'.format())
+
+        header = 'key,git_hash,file_name,method_name,file_rename_count,method_rename_count,change_type_count,' \
+                 'file_count_last,file_count_max, file_count_mean, file_count_sum,' \
+                 'file_added_last, file_added_max, file_added_mean, file_added_sum,' \
+                 'file_removed_last, file_removed_max, file_removed_mean, file_removed_sum,' \
+                 'file_nloc_last, file_nloc_max, file_nloc_mean, file_nloc_sum,' \
+                 'file_comp_last, file_comp_max, file_comp_mean, file_comp_sum,' \
+                 'file_token_count_last, file_token_count_max, file_token_count_mean, file_token_count_sum,' \
+                 'method_count_last, method_count_max, method_count_mean, method_count_sum,' \
+                 'method_added_last, method_added_max, method_added_mean, method_added_sum,' \
+                 'method_removed_last, method_removed_max, method_removed_mean, method_removed_sum,' \
+                 'method_nloc_last, method_nloc_max, method_nloc_mean, method_nloc_sum,' \
+                 'method_comp_last, method_comp_max, method_comp_mean, method_comp_sum,' \
+                 'method_token_last, method_token_max, method_token_mean, method_token_sum,' \
+                 'method_method_number_of_line_last, method_method_number_of_line_max, method_method_number_of_line_mean, method_method_number_of_line_sum,' \
+                 'method_fan_in_last, method_fan_in_max, method_fan_in_mean, method_fan_in_sum,' \
+                 'method_fan_out_last, method_fan_out_max, method_fan_out_mean, method_fan_out_sum,' \
+                 'method_general_fan_out_last, method_general_fan_out_max, method_general_fan_out_mean, method_general_fan_out_sum,' \
+                 'method_parameters_counts_last, method_parameters_counts_max, method_parameters_counts_mean, method_parameters_counts_sum,' \
+                 'author_email_mean, author_email_sum,' \
+                 'bug_sum, bug_mean, buggy\n'
+        output.write(header)
 
         for key, value in methods.items():
-            n_changes = len(value)
-            hash = value[0]['hash']
-            file = value[0]['file']
-            method = value[0]['method']
+            git_hashs = []
+            file_names = []
+            method_names = []
+            change_types = []
+            file_counts = []
+            file_addeds = []
+            file_removeds = []
+            file_nlocs = []
+            file_comps = []
+            file_token_counts = []
+            method_counts = []
+            method_addeds = []
+            method_removeds = []
+            method_nlcos = []
+            method_comps = []
+            method_tokens = []
+            method_number_of_lines = []
+            method_fan_ins = []
+            method_fan_outs = []
+            method_general_fan_outs = []
+            method_parameters_counts = []
+            author_emails = []
+            buggys = []
 
-            file_count = value[0]['file_count']
-            max_file_count = max(x['file_count'] for x in value)
-            avg_file_count = float(sum(x['file_count'] for x in value)) / n_changes
+            # Identifiers
+            git_hash = value[0].git_hash
+            file_name = value[0].file_name
+            method_name = value[0].method_name
+            buggy = value[0].buggy
 
-            added = value[0]['added']
-            max_added = max(x['added'] for x in value)
-            avg_added = float(sum(x['added'] for x in value)) / n_changes
-            removed = value[0]['removed']
-            max_removed = max(x['removed'] for x in value)
-            avg_removed = float(sum(x['removed'] for x in value)) / n_changes
-            loc = value[0]['loc']
-            max_loc = max(x['loc'] for x in value)
-            avg_loc = float(sum(x['loc'] for x in value)) / n_changes
-            token_count = value[0]['token_count']
-            max_token_count = max(x['token_count'] for x in value)
-            avg_token_count = float(sum(x['token_count'] for x in value)) / n_changes
-            methods = value[0]['methods']
-            max_methods = max(x['methods'] for x in value)
-            avg_methods = float(sum(x['methods'] for x in value)) / n_changes
-            comp = value[0]['comp']
-            max_comp = max(x['comp'] for x in value)
-            avg_comp = float(sum(x['comp'] for x in value)) / n_changes
+            # List of process metrics
+            for n in range(0, len(value)):
+                git_hashs.append(value[n].git_hash)
+                file_names.append(value[n].file_name)
+                method_names.append(value[n].method_name)
+                change_types.append(value[n].change_type)
+                file_counts.append(value[n].file_count)
+                file_addeds.append(value[n].file_added)
+                file_removeds.append(value[n].file_removed)
+                file_nlocs.append(value[n].file_nloc)
+                file_comps.append(value[n].file_comp)
+                file_token_counts.append(value[n].file_token_count)
+                # Method
+                method_counts.append(value[n].method_count)
+                method_addeds.append(value[n].method_added)
+                method_removeds.append(value[n].method_removed)
+                method_nlcos.append(value[n].method_nloc)
+                method_comps.append(value[n].method_comp)
+                method_tokens.append(value[n].method_token)
+                method_number_of_lines.append(value[n].method_number_of_lines)
+                method_fan_ins.append(value[n].method_fan_in)
+                method_fan_outs.append(value[n].method_fan_out)
+                method_general_fan_outs.append(value[n].method_general_fan_out)
+                method_parameters_counts.append(value[n].method_parameters_count)
+                author_emails.append(value[n].author_email)
 
-            m_token = value[0]['m_token']
-            max_m_token = max(x['m_token'] for x in value)
-            avg_m_token = float(sum(x['m_token'] for x in value)) / n_changes
-            m_fan_in = value[0]['m_fan_in']
-            m_fan_out = value[0]['m_fan_out']
-            m_g_fan_out = value[0]['m_g_fan_out']
-            m_loc = value[0]['m_loc']
-            max_m_loc = max(x['m_loc'] for x in value)
-            avg_m_loc = float(sum(x['m_loc'] for x in value)) / n_changes
-            m_length = value[0]['m_length']
-            max_m_length = max(x['m_length'] for x in value)
-            avg_m_length = float(sum(x['m_length'] for x in value)) / n_changes
-            m_comp = value[0]['m_comp']
-            max_m_comp = max(x['m_comp'] for x in value)
-            avg_m_comp = float(sum(x['m_comp'] for x in value)) / n_changes
+                buggys.append(int(value[n].buggy))
 
-            m_param_count = len(value[0]['m_param_count'])
-            max_m_param_count = max(len(x['m_param_count']) for x in value)
-            avg_m_param_count = float(sum(len(x['m_param_count']) for x in value)) / n_changes
-            m_added = value[0]['m_added']
-            max_m_added = max(x['m_added'] for x in value)
-            avg_m_added = float(sum(x['m_added'] for x in value)) / n_changes
-            m_removed = value[0]['m_removed']
-            max_m_removed = max(x['m_removed'] for x in value)
-            avg_m_removed = float(sum(x['m_removed'] for x in value)) / n_changes
+            # Other process metrics
+            file_rename_count = len(set(file_names))
+            method_rename_count = len(set(method_names))
+            change_type_count = len(set(change_types))
 
-            author_number = len(set(x['author_email'] for x in value))
-            bug_count = sum(x['buggy'] for x in value)
-            buggy = value[0]['buggy']
+            # File metrics
+            file_count_last = value[0].file_count
+            file_count_max = max(file_counts)
+            file_count_mean = st.mean(file_counts)
+            file_count_sum = sum(file_counts)
+
+            file_added_last = value[0].file_added
+            file_added_max = max(file_addeds)
+            file_added_mean = st.mean(file_addeds)
+            file_added_sum = sum(file_addeds)
+
+            file_removed_last = value[0].file_removed
+            file_removed_max = max(file_removeds)
+            file_removed_mean = st.mean(file_removeds)
+            file_removed_sum = sum(file_removeds)
+
+            file_nloc_last = value[0].file_nloc
+            file_nloc_max = max(file_nlocs)
+            file_nloc_mean = st.mean(file_nlocs)
+            file_nloc_sum = sum(file_nlocs)
+
+            file_comp_last = value[0].file_comp
+            file_comp_max = max(file_comps)
+            file_comp_mean = st.mean(file_comps)
+            file_comp_sum = sum(file_comps)
+
+            file_token_count_last = value[0].file_token_count
+            file_token_count_max = max(file_token_counts)
+            file_token_count_mean = st.mean(file_token_counts)
+            file_token_count_sum = sum(file_token_counts)
+
+            # Methods metrics
+            method_count_last = value[0].method_count
+            method_count_max = max(method_counts)
+            method_count_mean = st.mean(method_counts)
+            method_count_sum = sum(method_counts)
+
+            method_added_last = value[0].method_added
+            method_added_max = max(method_addeds)
+            method_added_mean = st.mean(method_addeds)
+            method_added_sum = sum(method_addeds)
+
+            method_removed_last = value[0].method_removed
+            method_removed_max = max(method_removeds)
+            method_removed_mean = st.mean(method_removeds)
+            method_removed_sum = sum(method_removeds)
+
+            method_nloc_last = value[0].method_nloc
+            method_nloc_max = max(method_nlcos)
+            method_nloc_mean = st.mean(method_nlcos)
+            method_nloc_sum = sum(method_nlcos)
+
+            method_comp_last = value[0].method_comp
+            method_comp_max = max(method_comps)
+            method_comp_mean = st.mean(method_comps)
+            method_comp_sum = sum(method_comps)
+
+            method_token_last = value[0].method_token
+            method_token_max = max(method_tokens)
+            method_token_mean = st.mean(method_tokens)
+            method_token_sum = sum(method_tokens)
+
+            method_method_number_of_line_last = value[0].method_number_of_lines
+            method_method_number_of_line_max = max(method_number_of_lines)
+            method_method_number_of_line_mean = st.mean(method_number_of_lines)
+            method_method_number_of_line_sum = sum(method_number_of_lines)
+
+            method_fan_in_last = value[0].method_fan_in
+            method_fan_in_max = max(method_fan_ins)
+            method_fan_in_mean = st.mean(method_fan_ins)
+            method_fan_in_sum = sum(method_fan_ins)
+
+            method_fan_out_last = value[0].method_fan_out
+            method_fan_out_max = max(method_fan_outs)
+            method_fan_out_mean = st.mean(method_fan_outs)
+            method_fan_out_sum = sum(method_fan_outs)
+
+            method_general_fan_out_last = value[0].method_general_fan_out
+            method_general_fan_out_max = max(method_general_fan_outs)
+            method_general_fan_out_mean = st.mean(method_general_fan_outs)
+            method_general_fan_out_sum = sum(method_general_fan_outs)
+
+            method_parameters_counts_last = value[0].method_parameters_count
+            method_parameters_counts_max = max(method_parameters_counts)
+            method_parameters_counts_mean = st.mean(method_parameters_counts)
+            method_parameters_counts_sum = sum(method_parameters_counts)
+
+            author_email_last = len(set(author_emails)) / len(value)
+            author_email_sum = len(set(author_emails))
+
+            buggy_sum = sum(buggys)
+            buggy_mean = sum(buggys) / len(value)
+
             # Append process metrics to CSV file
-            out_string = '{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(
-                hash, key, file, method, n_changes,
-                file_count, max_file_count, avg_file_count,
+            out_string = '{},{},{},{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},' \
+                         '{},{},{},\n'.format(
+                key.replace(',','-comma-'), git_hash, file_name.replace(',','-comma-'), method_name.replace(',','-comma-'), file_rename_count, method_rename_count, change_type_count,
 
-                added, max_added, avg_added,
-                removed, max_removed, avg_removed,
-                loc, max_loc, avg_loc,
-                comp, max_comp, avg_comp,
-                token_count, max_token_count, avg_token_count,
-                methods, max_methods, avg_methods,
+                file_count_last, file_count_max, file_count_mean, file_count_sum,
+                file_added_last, file_added_max, file_added_mean, file_added_sum,
+                file_removed_last, file_removed_max, file_removed_mean, file_removed_sum,
+                file_nloc_last, file_nloc_max, file_nloc_mean, file_nloc_sum,
+                file_comp_last, file_comp_max, file_comp_mean, file_comp_sum,
+                file_token_count_last, file_token_count_max, file_token_count_mean, file_token_count_sum,
+                method_count_last, method_count_max, method_count_mean, method_count_sum,
+                method_added_last, method_added_max, method_added_mean, method_added_sum,
+                method_removed_last, method_removed_max, method_removed_mean, method_removed_sum,
+                method_nloc_last, method_nloc_max, method_nloc_mean, method_nloc_sum,
+                method_comp_last, method_comp_max, method_comp_mean, method_comp_sum,
+                method_token_last, method_token_max, method_token_mean, method_token_sum,
+                method_method_number_of_line_last, method_method_number_of_line_max, method_method_number_of_line_mean, method_method_number_of_line_sum,
+                method_fan_in_last, method_fan_in_max, method_fan_in_mean, method_fan_in_sum,
+                method_fan_out_last, method_fan_out_max, method_fan_out_mean, method_fan_out_sum,
+                method_general_fan_out_last, method_general_fan_out_max, method_general_fan_out_mean, method_general_fan_out_sum,
+                method_parameters_counts_last, method_parameters_counts_max, method_parameters_counts_mean, method_parameters_counts_sum,
+                author_email_last, author_email_sum,
 
-                m_token, max_m_token, avg_m_token,
-                m_fan_in, m_fan_out, m_g_fan_out,
-                m_loc, max_m_loc, avg_m_loc,
-                m_length, max_m_length, avg_m_length,
-                m_comp, max_m_comp, avg_m_comp,
-                m_param_count, max_m_param_count, avg_m_param_count,
-                m_added, max_m_added, avg_m_added,
-                m_removed, max_m_removed, avg_m_removed,
-                author_number,
-                bug_count, buggy)
+                buggy_sum, buggy_mean, buggy)
             output.write(out_string)
-            # print(out_string)
+            output.flush()
+        output.close()
+        # print(out_string)

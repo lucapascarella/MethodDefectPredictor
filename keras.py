@@ -62,9 +62,9 @@ if __name__ == '__main__':
     print('Is eager enabled: ' + str(tf.executing_eagerly()))
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', type=str, help='Input CSV file', default='pima_indian_data.csv')
+    parser.add_argument('-i', '--input', type=str, help='Local absolute or relative path to a valid CSV dataset.', default='pima_indian_data.csv')
     parser.add_argument('-k', '--kfolds', type=str, help='Number of k-folds', default=1)
-    parser.add_argument('-s', '--save', type=str, help='Save model', default='model.h5')
+    parser.add_argument('-s', '--save', type=str, help='Save model', default='data/model.h5')
     args, unknown = parser.parse_known_args()
 
     # Read and split in X and Y data from CSV file
