@@ -1,4 +1,4 @@
-import os
+import datetime, os
 import statistics as st
 from typing import List, Dict
 from pydriller import RepositoryMining, GitRepository
@@ -7,12 +7,15 @@ from method_metrics import MethodMetrics
 
 
 class MinerBean:
-    def __init__(self, git_hash: str, file_name: str, method_name: str, change_type: ModificationType,
+    def __init__(self, git_hash: str, git_commiter_date: datetime, file_name: str, method_name: str, change_type: ModificationType,
                  file_count: int, file_added: int, file_removed: int, file_nloc: int, file_comp: int, file_token_count: int,
                  method_count: int, method_added: int, method_removed: int, method_nlco: int, method_comp: int, method_token: int,
+                 file_buggy: bool,
                  method_number_of_lines: int, method_fan_in: int, method_fan_out: int, method_general_fan_out: int, method_parameters_count: int,
-                 author_email: str, buggy: bool):
+                 author_email: str,
+                 method_touched: bool, method_buggy: bool):
         self.git_hash = git_hash
+        self.git_commiter_date = git_commiter_date
         self.file_name = file_name
         self.method_name = method_name
         self.change_type = change_type
@@ -23,6 +26,7 @@ class MinerBean:
         self.file_nloc = file_nloc
         self.file_comp = file_comp
         self.file_token_count = file_token_count
+        self.file_buggy = file_buggy
 
         self.method_count = method_count
         self.method_added = method_added
@@ -38,19 +42,23 @@ class MinerBean:
         self.method_parameters_count = method_parameters_count
 
         self.author_email = author_email
-        self.buggy = buggy
+        self.method_touched = method_touched
+        self.method_buggy = method_buggy
 
-    @staticmethod
-    def retrieve_names():
-        return ['git_hash', 'file_name', 'method_name', 'change_type',
-                'file_count', 'file_added', 'file_removed', 'file_nloc', 'file_comp', 'file_token_count',
-                'method_count', 'method_added', 'method_removed', 'method_nlco', 'method_comp', 'method_token',
-                'method_number_of_lines', 'method_fan_in', 'method_fan_out', 'method_general_fan_out', 'method_parameters_count',
-                'author_email', 'buggy']
+
+class MinerGit:
+    def __init__(self, repo_path):
+        self.repo_path = repo_path
+
+    def count_commits(self, recent_commit: str, oldest_commit: str) -> int:
+        cmd = 'git -C ' + self.repo_path + ' rev-list ' + recent_commit + ' ^' + oldest_commit + ' --count'
+        ret = os.popen(cmd).read()
+        if ret.strip().isdigit():
+            return int(ret)
+        return 0
 
 
 class Miner:
-
     def __init__(self, repo_path: str, allowed_extensions: List[str], bic_commits: List = [str]):
         if os.path.isdir(repo_path):
             self.repo_path = repo_path
@@ -61,14 +69,19 @@ class Miner:
 
     def mine_methods(self, start_commit: str, stop_commit: str, filter_methods: List[str] = None) -> Dict[str, List[MinerBean]]:
         methods = {}
+        first_commit = start_commit
+        if start_commit is None:
+            first_commit = GitRepository(self.repo_path).get_head().hash
+        commit_count = MinerGit(self.repo_path).count_commits(first_commit, stop_commit)
+
         count = 0
         print('Mining: ' + self.repo_path)
         gr = GitRepository(self.repo_path)
         for commit in RepositoryMining(self.repo_path, from_commit=stop_commit, to_commit=start_commit, reversed_order=True, only_modifications_with_file_types=self.allowed_extensions).traverse_commits():
-            print('{:06}) Commit: {} Date: {} Mods: {:}'.format(count, commit.hash, commit.committer_date.strftime('%d/%m/%Y'), len(commit.modifications)))
+            print('{:06}/{:06}) Commit: {} Date: {} Mods: {:}'.format(count, commit_count, commit.hash, commit.committer_date.strftime('%d/%m/%Y'), len(commit.modifications)))
             for mod in commit.modifications:
                 if mod.filename.endswith(tuple(self.allowed_extensions)):
-                    # print('{:06}) Commit: {} Date: {} Type: {:6} File: {}'.format(count, commit.hash, commit.committer_date.strftime('%d/%m/%Y'), mod.change_type.name, mod.filename))
+                    # print('{:06}/{:06}) Commit: {} Date: {} Type: {:6} File: {}'.format(count, commit_count, commit.hash, commit.committer_date.strftime('%d/%m/%Y'), mod.change_type.name, mod.filename))
                     if mod.change_type is ModificationType.RENAME:
                         new_methods = {}
                         for key, value in methods.items():
@@ -77,41 +90,45 @@ class Miner:
                                 key = mod.old_path + '$$' + method
                             new_methods[key] = value
                         methods = new_methods
-                    if mod.change_type is not ModificationType.DELETE:
-                        for method in mod.methods:
-                            buggy = True if commit.hash in self.bic_commits else False
-                            lines = gr.parse_diff(mod.diff)
-                            method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line)
-                            mb = MinerBean(commit.hash, mod.new_path, method.name, mod.change_type,
-                                           len(commit.modifications), mod.added, mod.removed, mod.nloc, mod.complexity, mod.token_count,
-                                           len(mod.methods), method_metrics.get_added_lines(lines), method_metrics.get_removed_lines(lines), method.nloc, method.complexity, method.token_count,
-                                           method_metrics.get_number_of_lines(), method.fan_in, method.fan_out, method.general_fan_out, len(method.parameters),
-                                           commit.committer.email, buggy
-                                           )
-                            key = mod.new_path + '$$' + method.name
+                    # if mod.change_type is not ModificationType.DELETE:
+                    for method in mod.methods:
+                        buggy = True if commit.hash in self.bic_commits else False
+                        lines = gr.parse_diff(mod.diff)
+                        method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line, lines, buggy)
+                        m_touched = method_metrics.is_touched()
+                        m_buggy = method_metrics.is_buggy()
+                        mb = MinerBean(commit.hash, commit.committer_date, mod.new_path, method.name, mod.change_type,
+                                       len(commit.modifications), mod.added, mod.removed, mod.nloc, mod.complexity, mod.token_count,
+                                       len(mod.methods), method_metrics.get_added_lines(), method_metrics.get_removed_lines(), method.nloc, method.complexity, method.token_count,
+                                       buggy,
+                                       method_metrics.get_number_of_lines(), method.fan_in, method.fan_out, method.general_fan_out, len(method.parameters),
+                                       commit.committer.email,
+                                       m_touched, m_buggy
+                                       )
+                        key = mod.new_path + '$$' + method.name
 
-                            if filter_methods is None or key in filter_methods:
-                                if key not in methods:
-                                    methods[key] = []
-                                methods.get(key, []).append(mb)
-                    count += 1
+                        if filter_methods is None or key in filter_methods:
+                            if key not in methods:
+                                methods[key] = []
+                            methods.get(key, []).append(mb)
+            count += 1
         print('Mining ended')
         return methods
 
     def get_touched_methods_per_commit(self, commit_hash: str) -> List[str]:
         methods = []
-        gr = GitRepository(self.repo_path)
-        commit = gr.get_commit(commit_hash)
-        for mod in commit.modifications:
-            if mod.change_type is not ModificationType.DELETE:
-                for method in mod.methods:
-                    method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line)
-                    lines = gr.parse_diff(mod.diff)
-                    added = method_metrics.get_added_lines(lines)
-                    removed = method_metrics.get_removed_lines(lines)
-                    if added > 0 or removed > 0:
-                        method_key = mod.new_path + '$$' + method.name
-                        methods.append(method_key)
+        # gr = GitRepository(self.repo_path)
+        # commit = gr.get_commit(commit_hash)
+        # for mod in commit.modifications:
+        #     if mod.change_type is not ModificationType.DELETE:
+        #         for method in mod.methods:
+        #             method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line)
+        #             lines = gr.parse_diff(mod.diff)
+        #             added = method_metrics.get_added_lines(lines)
+        #             removed = method_metrics.get_removed_lines(lines)
+        #             if added > 0 or removed > 0:
+        #                 method_key = mod.new_path + '$$' + method.name
+        #                 methods.append(method_key)
         return methods
 
     def print_metrics_per_method(self, csv_path: str, methods: Dict[str, List[MinerBean]]):
@@ -137,7 +154,7 @@ class Miner:
                  'method_general_fan_out_last, method_general_fan_out_max, method_general_fan_out_mean, method_general_fan_out_sum,' \
                  'method_parameters_counts_last, method_parameters_counts_max, method_parameters_counts_mean, method_parameters_counts_sum,' \
                  'author_email_mean, author_email_sum,' \
-                 'bug_sum, bug_mean, buggy\n'
+                 'file_buggy,method_bug_sum,method_bug_mean,method_buggy\n'
         output.write(header)
 
         for key, value in methods.items():
@@ -164,12 +181,15 @@ class Miner:
             method_parameters_counts = []
             author_emails = []
             buggys = []
+            touches = []
 
             # Identifiers
             git_hash = value[0].git_hash
             file_name = value[0].file_name
+            file_buggy = value[0].file_buggy
             method_name = value[0].method_name
-            buggy = value[0].buggy
+            method_touched = value[0].method_touched
+            method_buggy = value[0].method_buggy
 
             # List of process metrics
             for n in range(0, len(value)):
@@ -197,7 +217,7 @@ class Miner:
                 method_parameters_counts.append(value[n].method_parameters_count)
                 author_emails.append(value[n].author_email)
 
-                buggys.append(int(value[n].buggy))
+                buggys.append(int(value[n].method_buggy))
 
             # Other process metrics
             file_rename_count = len(set(file_names))
@@ -294,8 +314,8 @@ class Miner:
             author_email_last = len(set(author_emails)) / len(value)
             author_email_sum = len(set(author_emails))
 
-            buggy_sum = sum(buggys)
-            buggy_mean = sum(buggys) / len(value)
+            method_buggy_sum = sum(buggys)
+            method_buggy_mean = sum(buggys) / len(value)
 
             # Append process metrics to CSV file
             out_string = '{},{},{},{},{},{},{},' \
@@ -317,8 +337,8 @@ class Miner:
                          '{},{},{},{},' \
                          '{},{},{},{},' \
                          '{},{},' \
-                         '{},{},{},\n'.format(
-                key.replace(',','-comma-'), git_hash, file_name.replace(',','-comma-'), method_name.replace(',','-comma-'), file_rename_count, method_rename_count, change_type_count,
+                         '{},{},{},{},\n'.format(
+                key.replace(',', '-comma-'), git_hash, file_name.replace(',', '-comma-'), method_name.replace(',', '-comma-'), file_rename_count, method_rename_count, change_type_count,
 
                 file_count_last, file_count_max, file_count_mean, file_count_sum,
                 file_added_last, file_added_max, file_added_mean, file_added_sum,
@@ -339,7 +359,7 @@ class Miner:
                 method_parameters_counts_last, method_parameters_counts_max, method_parameters_counts_mean, method_parameters_counts_sum,
                 author_email_last, author_email_sum,
 
-                buggy_sum, buggy_mean, buggy)
+                file_buggy, method_buggy_sum, method_buggy_mean, method_buggy)
             output.write(out_string)
             output.flush()
         output.close()

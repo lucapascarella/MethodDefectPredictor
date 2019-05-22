@@ -40,7 +40,7 @@ In this project we use the [TensorFlow](https://www.tensorflow.org/) python libr
 
 ##### Command example
 ```sh
-python3 keras.py -r local/path/to/mozilla/gecko-dev -s 5192e340815e9aad5a59b350b9772319e4518417 -p d411f2814cc535b9a440bec670e08d37712b63c9 -i data/bic_commits.csv -o data/method_metrics.csv
+python3 keras.py -i data/method_metrics_cleaned.csv
 ```
 
 
