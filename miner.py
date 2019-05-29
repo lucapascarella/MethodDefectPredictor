@@ -78,10 +78,10 @@ class Miner:
         print('Mining: ' + self.repo_path)
         gr = GitRepository(self.repo_path)
         for commit in RepositoryMining(self.repo_path, from_commit=stop_commit, to_commit=start_commit, reversed_order=True, only_modifications_with_file_types=self.allowed_extensions).traverse_commits():
-            print('{:06}/{:06}) Commit: {} Date: {} Mods: {:}'.format(count, commit_count, commit.hash, commit.committer_date.strftime('%d/%m/%Y'), len(commit.modifications)))
+            print('{:06}/{:06}) Commit: {} Date: {} Mods: {:}'.format(count, commit_count, commit.hash, commit.author_date.strftime('%d/%m/%Y'), len(commit.modifications)))
             for mod in commit.modifications:
                 if mod.filename.endswith(tuple(self.allowed_extensions)):
-                    # print('{:06}/{:06}) Commit: {} Date: {} Type: {:6} File: {}'.format(count, commit_count, commit.hash, commit.committer_date.strftime('%d/%m/%Y'), mod.change_type.name, mod.filename))
+                    # print('{:06}/{:06}) Commit: {} Date: {} Type: {:6} File: {}'.format(count, commit_count, commit.hash, commit.author_date.strftime('%d/%m/%Y'), mod.change_type.name, mod.filename))
                     if mod.change_type is ModificationType.RENAME:
                         new_methods = {}
                         for key, value in methods.items():
@@ -97,12 +97,12 @@ class Miner:
                         method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line, lines, buggy)
                         m_touched = method_metrics.is_touched()
                         m_buggy = method_metrics.is_buggy()
-                        mb = MinerBean(commit.hash, commit.committer_date, mod.new_path, method.name, mod.change_type,
+                        mb = MinerBean(commit.hash, commit.author_date, mod.new_path, method.name, mod.change_type,
                                        len(commit.modifications), mod.added, mod.removed, mod.nloc, mod.complexity, mod.token_count,
                                        len(mod.methods), method_metrics.get_added_lines(), method_metrics.get_removed_lines(), method.nloc, method.complexity, method.token_count,
                                        buggy,
                                        method_metrics.get_number_of_lines(), method.fan_in, method.fan_out, method.general_fan_out, len(method.parameters),
-                                       commit.committer.email,
+                                       commit.author.email,
                                        m_touched, m_buggy
                                        )
                         key = mod.new_path + '$$' + method.name
@@ -333,9 +333,6 @@ class Miner:
                          '{},{},{},{},' \
                          '{},{},{},{},' \
                          '{},{},{},{},' \
-                         '{},{},{},{},' \
-                         '{},{},{},{},' \
-                         '{},{},{},{},' \
                          '{},{},' \
                          '{},{},{},{},\n'.format(
                 key.replace(',', '-comma-'), git_hash, file_name.replace(',', '-comma-'), method_name.replace(',', '-comma-'), file_rename_count, method_rename_count, change_type_count,
@@ -353,9 +350,9 @@ class Miner:
                 method_comp_last, method_comp_max, method_comp_mean, method_comp_sum,
                 method_token_last, method_token_max, method_token_mean, method_token_sum,
                 method_method_number_of_line_last, method_method_number_of_line_max, method_method_number_of_line_mean, method_method_number_of_line_sum,
-                method_fan_in_last, method_fan_in_max, method_fan_in_mean, method_fan_in_sum,
-                method_fan_out_last, method_fan_out_max, method_fan_out_mean, method_fan_out_sum,
-                method_general_fan_out_last, method_general_fan_out_max, method_general_fan_out_mean, method_general_fan_out_sum,
+                # method_fan_in_last, method_fan_in_max, method_fan_in_mean, method_fan_in_sum,
+                # method_fan_out_last, method_fan_out_max, method_fan_out_mean, method_fan_out_sum,
+                # method_general_fan_out_last, method_general_fan_out_max, method_general_fan_out_mean, method_general_fan_out_sum,
                 method_parameters_counts_last, method_parameters_counts_max, method_parameters_counts_mean, method_parameters_counts_sum,
                 author_email_last, author_email_sum,
 
