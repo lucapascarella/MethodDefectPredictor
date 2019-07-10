@@ -61,7 +61,6 @@ if __name__ == '__main__':
     count = 0
     for fix in fixes:
         git_hash = fix['git_hash']
-        # git_hash = '3313bae468461fae603d60ab5f9847d82261137b'
         print('{}) Processing {} '.format(count, git_hash))
         fix_commit = gr.get_commit(git_hash)
         if args.notuse:

@@ -1,5 +1,4 @@
 import argparse
-import csv
 
 import numpy
 from sklearn.preprocessing import StandardScaler
@@ -35,32 +34,30 @@ def read_data(input_path: str) -> (List[List[float]], List[int]):
     usecols = list(range(4, count - 4))
     usecols.append(count - 1)
 
-    dataset = numpy.loadtxt(skipper(input_path, True), delimiter=",", usecols=(usecols))
+    dataset = numpy.loadtxt(skipper(input_path, True), delimiter=",", usecols=usecols)
     # split into input (X) and output (Y) variables
     x = dataset[:, 0:-1]
     y = dataset[:, -1]
+    # standardizing the input feature
+    # sc = StandardScaler()
+    # x = sc.fit_transform(x)
     return len(x[0]), x, y
 
 
-def create_model(count, x_train, y_train):
+def create_model(count):
     # Define our classifier
-    classifier = Sequential()
+    model = Sequential()
     # First Layer
-    classifier.add(Dense(count, activation=tf.nn.relu, kernel_initializer='random_normal', input_dim=count))
+    model.add(Dense(count, activation=tf.nn.relu, kernel_initializer='random_normal', input_dim=count))
     # Second  Hidden Layer
     # classifier.add(Dense(6, activation='relu', kernel_initializer='random_normal'))
     # classifier.add(Dropout(rate=0.2))
-    classifier.add(Dense(6, activation='relu', kernel_initializer='random_normal'))
+    model.add(Dense(6, activation='relu', kernel_initializer='random_normal'))
     # Output Layer
-    classifier.add(Dense(1, activation='sigmoid', kernel_initializer='random_normal'))
-
+    model.add(Dense(1, activation='sigmoid', kernel_initializer='random_normal'))
     # Compiling the neural network
-    classifier.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-
-    # Fitting the data to the training dataset
-    # classifier.fit(x_train, y_train, validation_data=(x_test, y_test), batch_size=10, epochs=100)
-    classifier.fit(x_train, y_train, batch_size=10, epochs=100, verbose=0)
-    return classifier
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    return model
 
 
 if __name__ == '__main__':
@@ -89,7 +86,9 @@ if __name__ == '__main__':
     if args.kfolds == 1:
         # Single training case
         x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3)
-        model = create_model(count, x_train, y_train)
+        model = create_model(count)
+        # Fitting the data to the training dataset
+        model.fit(x_train, y_train, batch_size=10, epochs=10, verbose=1)
         loss, accuracy = model.evaluate(x_test, y_test)
         model.summary()
         print('Loss: {:.2f} Accuracy: {:.2f}'.format(loss, accuracy))
@@ -116,7 +115,9 @@ if __name__ == '__main__':
         scores = {'Accuracy': [], 'F-score': [], 'MCC': []}
         for train, test in kfold.split(x, y):
             # Split dataset in training and testing part
-            model = create_model(count, x[train], y[train])
+            model = create_model(count)
+            # Fitting the data to the training dataset
+            model.fit( x[train], y[train], batch_size=10, epochs=5, verbose=1)
             loss, accuracy = model.evaluate(x[test], y[test])
             # model.summary()
             print('Loss: {:.2f} Accuracy: {:.2f}'.format(loss, accuracy))

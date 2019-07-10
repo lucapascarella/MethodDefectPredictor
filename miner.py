@@ -62,14 +62,14 @@ class Miner:
     def __init__(self, repo_path: str, allowed_extensions: List[str], bic_commits: List[str] = [str]):
         if repo_path is None:
             print('A local repository path must be specified')
-            exit(0)
+            exit(-1)
         elif os.path.isdir(repo_path):
             self.repo_path = repo_path
             self.allowed_extensions = allowed_extensions
             self.bic_commits = bic_commits
         else:
             print('The following path does not exist: ' + repo_path)
-            exit(0)
+            exit(-1)
 
     def mine_methods(self, start_commit: str, stop_commit: str, filter_methods: List[str] = [str]) -> Dict[str, List[MinerBean]]:
         methods = {}
@@ -119,21 +119,6 @@ class Miner:
         print('Mining ended')
         return methods
 
-    def get_touched_methods_per_commit(self, commit_hash: str) -> List[str]:
-        methods = []
-        # gr = GitRepository(self.repo_path)
-        # commit = gr.get_commit(commit_hash)
-        # for mod in commit.modifications:
-        #     if mod.change_type is not ModificationType.DELETE:
-        #         for method in mod.methods:
-        #             method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line)
-        #             lines = gr.parse_diff(mod.diff)
-        #             added = method_metrics.get_added_lines(lines)
-        #             removed = method_metrics.get_removed_lines(lines)
-        #             if added > 0 or removed > 0:
-        #                 method_key = mod.new_path + '$$' + method.name
-        #                 methods.append(method_key)
-        return methods
 
     def print_metrics_per_method(self, csv_path: str, methods: Dict[str, List[MinerBean]]):
         print('Saving ' + str(len(methods)) + ' methods')
@@ -184,8 +169,9 @@ class Miner:
             method_general_fan_outs = []
             method_parameters_counts = []
             author_emails = []
-            buggys = []
             touches = []
+            buggys = []
+
 
             # Identifiers
             git_hash = value[0].git_hash

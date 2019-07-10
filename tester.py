@@ -1,8 +1,6 @@
 import argparse, os, numpy
-import csv
 
-from pydriller import GitRepository
-from pydriller.domain.commit import ModificationType
+from sklearn.preprocessing import StandardScaler
 from miner import Miner
 from tensorflow import keras
 
@@ -23,13 +21,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--repo', type=str, help='Absolute GIT repository path', default=None)
     parser.add_argument('-e', '--ext', type=str, help='List of allowed extensions. Eg. .cpp .c', default='.cpp')
-    parser.add_argument('-s', '--start', type=str, help='Commit HASH to analyze', default='a32b3797428598d02798384a6f657d90d17821f7')
-    parser.add_argument('-p', '--stop', type=str, help='Stop HASH commit, if not specified it analyzes up to the end.', default='33af9598d8e98940f3942bbd7db2dec1e4526a50')
+    parser.add_argument('-s', '--start', type=str, help='Commit HASH to analyze', default='e226046cb8843580086117bafc060898cdcbee2f')
+    parser.add_argument('-p', '--stop', type=str, help='Stop HASH commit, if not specified it analyzes up to the end.', default='e6c57445435d378833e3e282d3f0aba3479f7733')
     parser.add_argument('-o', '--output', type=str, help='Path of the CSV file where to save results.', default='data/testing_output.csv')
     parser.add_argument('-m', '--model', type=str, help='Path of the machine learning model.', default='data/model.h5')
     args, unknown = parser.parse_known_args()
 
-    temp_csv = 'temp.csv'
+    temp1_csv = 'temp1.csv'
+    temp2_csv = 'temp2.csv'
 
     if args.start is None or args.stop is None:
         print('A pair of commit HASHs must be passed as input!')
@@ -38,34 +37,46 @@ if __name__ == '__main__':
         print('A valid trained model must be passed ad input argument!')
         exit(-1)
 
+    # Get method's metrics
     miner = Miner(args.repo, args.ext)
-    # # methods = miner.get_touched_methods_per_commit(args.commit)
-    # # print(args.commit + ' has changed ' + str(len(methods)) + ' methods')
     metrics = miner.mine_methods(args.start, args.stop)
-    miner.print_metrics_per_method(temp_csv, metrics)
-    print('Found metrics for ' + str(len(metrics)) + ' methods')
+    miner.print_metrics_per_method(temp1_csv, metrics)
 
+    # Count the number of columns into which split dataset and filter out other commits
+    fin = open(temp1_csv, mode='r')
+    header = fin.readline()
+    fout = open(temp2_csv, mode='w')
+    fout.write(header)
+    lines = fin.readlines()
+    for line in lines:
+        cols = line.split(',')
+        if cols[1] == args.start:
+            fout.write(line)
+    fin.close()
+    fout.close()
+
+    fin = open(temp2_csv, mode='r')
+    count = len(fin.readline().split(","))
+    fin.close()
+
+    # Read the CSV file that contains fresh mined metrics
+    dataset = numpy.loadtxt(skipper(temp2_csv, True), delimiter=",", usecols=(range(4, count - 4)))
+    # split into input (X) and output (Y) variables
+    x = dataset[:, :]
+    # Standardizing the input feature
+    sc = StandardScaler()
+    x = sc.fit_transform(x)
+
+    # Load TensorFlow pre-trained model and perform a prediction
     print('Load trained model: ' + args.model)
     model = keras.models.load_model(args.model)
     model.summary()
-
-    # Count columns to split dataset
-    fin = open(temp_csv)
-    columns = fin.readline().split(",")
-    count = len(columns)
-    fin.close()
-
-    # Read CSV file that contains headers
-    dataset = numpy.loadtxt(skipper(temp_csv, True), delimiter=",", usecols=(range(4, count - 4)))
-    # split into input (X) and output (Y) variables
-    x = dataset[:, :]
-
     y_pred = model.predict(x)
     y_pred = (y_pred > 0.5)
 
     # Read CSV file
     defective_methods = 0
-    with open(temp_csv, mode='r') as infile:
+    with open(temp2_csv, mode='r') as infile:
         with open(args.output, mode='w') as outfile:
             header = infile.readline().strip().split(',')
             header = ','.join(header[:-4]) + ',' + 'Prediction' + '\n'
