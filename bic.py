@@ -32,11 +32,11 @@ if __name__ == '__main__':
 
     # Check that a valid repos is specified
     if args.repo is None or not os.path.isdir(args.repo):
-        print('A valid path to a GIT repository must be specified!')
+        print('A valid path to a local GIT repository must be specified!')
         exit(-1)
     # Check that a valid input is specified
     if not os.path.isfile(args.input):
-        print('A valid path to a input CSV must be given as input!')
+        print('A valid path to an input (CSV file) must be given as input!')
         exit(-1)
     # Check that a valid ignore file is specified
     if args.notuse is not None:

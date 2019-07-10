@@ -59,15 +59,19 @@ class MinerGit:
 
 
 class Miner:
-    def __init__(self, repo_path: str, allowed_extensions: List[str], bic_commits: List = [str]):
-        if os.path.isdir(repo_path):
+    def __init__(self, repo_path: str, allowed_extensions: List[str], bic_commits: List[str] = [str]):
+        if repo_path is None:
+            print('A local repository path must be specified')
+            exit(0)
+        elif os.path.isdir(repo_path):
             self.repo_path = repo_path
             self.allowed_extensions = allowed_extensions
             self.bic_commits = bic_commits
         else:
             print('The following path does not exist: ' + repo_path)
+            exit(0)
 
-    def mine_methods(self, start_commit: str, stop_commit: str, filter_methods: List[str] = None) -> Dict[str, List[MinerBean]]:
+    def mine_methods(self, start_commit: str, stop_commit: str, filter_methods: List[str] = [str]) -> Dict[str, List[MinerBean]]:
         methods = {}
         first_commit = start_commit
         if start_commit is None:
@@ -107,7 +111,7 @@ class Miner:
                                        )
                         key = mod.new_path + '$$' + method.name
 
-                        if filter_methods is None or key in filter_methods:
+                        if key not in filter_methods: # Filter methods is no longer needed
                             if key not in methods:
                                 methods[key] = []
                             methods.get(key, []).append(mb)
@@ -319,6 +323,14 @@ class Miner:
 
             # Append process metrics to CSV file
             out_string = '{},{},{},{},{},{},{},' \
+            \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+                         '{},{},{},{},' \
+            \
                          '{},{},{},{},' \
                          '{},{},{},{},' \
                          '{},{},{},{},' \
@@ -330,10 +342,9 @@ class Miner:
                          '{},{},{},{},' \
                          '{},{},{},{},' \
                          '{},{},{},{},' \
-                         '{},{},{},{},' \
-                         '{},{},{},{},' \
-                         '{},{},{},{},' \
+            \
                          '{},{},' \
+            \
                          '{},{},{},{},\n'.format(
                 key.replace(',', '-comma-'), git_hash, file_name.replace(',', '-comma-'), method_name.replace(',', '-comma-'), file_rename_count, method_rename_count, change_type_count,
 
@@ -343,6 +354,7 @@ class Miner:
                 file_nloc_last, file_nloc_max, file_nloc_mean, file_nloc_sum,
                 file_comp_last, file_comp_max, file_comp_mean, file_comp_sum,
                 file_token_count_last, file_token_count_max, file_token_count_mean, file_token_count_sum,
+
                 method_count_last, method_count_max, method_count_mean, method_count_sum,
                 method_added_last, method_added_max, method_added_mean, method_added_sum,
                 method_removed_last, method_removed_max, method_removed_mean, method_removed_sum,
@@ -350,13 +362,14 @@ class Miner:
                 method_comp_last, method_comp_max, method_comp_mean, method_comp_sum,
                 method_token_last, method_token_max, method_token_mean, method_token_sum,
                 method_method_number_of_line_last, method_method_number_of_line_max, method_method_number_of_line_mean, method_method_number_of_line_sum,
-                # method_fan_in_last, method_fan_in_max, method_fan_in_mean, method_fan_in_sum,
-                # method_fan_out_last, method_fan_out_max, method_fan_out_mean, method_fan_out_sum,
-                # method_general_fan_out_last, method_general_fan_out_max, method_general_fan_out_mean, method_general_fan_out_sum,
+                method_fan_in_last, method_fan_in_max, method_fan_in_mean, method_fan_in_sum,
+                method_fan_out_last, method_fan_out_max, method_fan_out_mean, method_fan_out_sum,
+                method_general_fan_out_last, method_general_fan_out_max, method_general_fan_out_mean, method_general_fan_out_sum,
                 method_parameters_counts_last, method_parameters_counts_max, method_parameters_counts_mean, method_parameters_counts_sum,
+
                 author_email_last, author_email_sum,
 
-                file_buggy, method_buggy_sum, method_buggy_mean, method_buggy)
+                (1 if file_buggy else 0), method_buggy_sum, method_buggy_mean, (1 if method_buggy else 0))
             output.write(out_string)
             output.flush()
         output.close()

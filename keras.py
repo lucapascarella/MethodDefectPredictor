@@ -25,23 +25,32 @@ def skipper(fname, header=False):
 
 
 def read_data(input_path: str) -> (List[List[float]], List[int]):
-    # Read CSV file that contains headers
-    dataset = numpy.loadtxt(skipper(input_path, True), delimiter=",")
+    # Count columns to split dataset
+    fin = open(input_path)
+    columns = fin.readline().split(",")
+    count = len(columns)
+    fin.close()
+
+    # Select only metrics and buggy columns
+    usecols = list(range(4, count - 4))
+    usecols.append(count - 1)
+
+    dataset = numpy.loadtxt(skipper(input_path, True), delimiter=",", usecols=(usecols))
     # split into input (X) and output (Y) variables
-    x = dataset[:, 0:8]
-    y = dataset[:, 8]
-    return x, y
+    x = dataset[:, 0:-1]
+    y = dataset[:, -1]
+    return len(x[0]), x, y
 
 
-def create_model(x_train, y_train):
+def create_model(count, x_train, y_train):
     # Define our classifier
     classifier = Sequential()
     # First Layer
-    classifier.add(Dense(8, activation=tf.nn.relu, kernel_initializer='random_normal', input_dim=8))
+    classifier.add(Dense(count, activation=tf.nn.relu, kernel_initializer='random_normal', input_dim=count))
     # Second  Hidden Layer
     # classifier.add(Dense(6, activation='relu', kernel_initializer='random_normal'))
     # classifier.add(Dropout(rate=0.2))
-    classifier.add(Dense(4, activation='relu', kernel_initializer='random_normal'))
+    classifier.add(Dense(6, activation='relu', kernel_initializer='random_normal'))
     # Output Layer
     classifier.add(Dense(1, activation='sigmoid', kernel_initializer='random_normal'))
 
@@ -59,16 +68,19 @@ if __name__ == '__main__':
 
     print('TensorFlow version: ' + tf.__version__)
     print('Is GPU available: ' + str(tf.test.is_gpu_available()))
+    print('Is CUDA built: ' + str(tf.test.is_built_with_cuda()))
     print('Is eager enabled: ' + str(tf.executing_eagerly()))
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', type=str, help='Local absolute or relative path to a valid CSV dataset.', default='pima_indian_data.csv')
+    parser.add_argument('-i', '--input', type=str, help='Local absolute or relative path to a valid CSV dataset.', default='data/method_metrics.csv')
     parser.add_argument('-k', '--kfolds', type=str, help='Number of k-folds', default=1)
     parser.add_argument('-s', '--save', type=str, help='Save model', default='data/model.h5')
     args, unknown = parser.parse_known_args()
 
     # Read and split in X and Y data from CSV file
-    x, y = read_data(args.input)
+    count, x, y = read_data(args.input)
+    print('Features count: ' + str(count))
+    print('Instances count: ' + str(len(x)))
 
     # Standardizing the input feature
     sc = StandardScaler()
@@ -77,7 +89,7 @@ if __name__ == '__main__':
     if args.kfolds == 1:
         # Single training case
         x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3)
-        model = create_model(x_train, y_train)
+        model = create_model(count, x_train, y_train)
         loss, accuracy = model.evaluate(x_test, y_test)
         model.summary()
         print('Loss: {:.2f} Accuracy: {:.2f}'.format(loss, accuracy))
@@ -104,7 +116,7 @@ if __name__ == '__main__':
         scores = {'Accuracy': [], 'F-score': [], 'MCC': []}
         for train, test in kfold.split(x, y):
             # Split dataset in training and testing part
-            model = create_model(x[train], y[train])
+            model = create_model(count, x[train], y[train])
             loss, accuracy = model.evaluate(x[test], y[test])
             # model.summary()
             print('Loss: {:.2f} Accuracy: {:.2f}'.format(loss, accuracy))
