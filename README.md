@@ -11,7 +11,8 @@ In this example, an external tool [bugbug](https://github.com/mozilla/bugbug) fr
 ```data/fix_commits.csv``` contains a pre-mined list of fixes identified with *bugbug*.
 
 ### 2. Bug inducing commits 
-```bic.py``` is a python script designed to identify the _bug inducing commits_ (BIC) starting from a list of GIT commits.
+```bic.py``` is a python script designed to identify the _bug inducing commits_ (BIC) starting from a list of GIT commits. This tool relies on git hyper blame to ignore a list of commits. Git Hyper Blame is available from [Chromium tools](https://commondatastorage.googleapis.com/chrome-infra-docs/flat/depot_tools/docs/html/git-hyper-blame.html).
+Install locally by using ```git clone https://chromium.googlesource.com/chromium/tools/depot_tools```
 
 ##### Command example
 ```sh
