@@ -345,7 +345,7 @@ class Miner:
             \
                          '{},{},' \
             \
-                         '{},{},{},{},\n'.format(
+                         '{},{},{},{}\n'.format(
                 key.replace(',', '-comma-'), git_hash, file_name.replace(',', '-comma-'), method_name.replace(',', '-comma-'), file_rename_count, method_rename_count, change_type_count,
 
                 file_count_last, file_count_max, file_count_mean, file_count_sum,

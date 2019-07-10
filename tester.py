@@ -64,17 +64,22 @@ if __name__ == '__main__':
     y_pred = (y_pred > 0.5)
 
     # Read CSV file
+    defective_methods = 0
     with open(temp_csv, mode='r') as infile:
         with open(args.output, mode='w') as outfile:
-            header = infile.readline() + ',' + 'Prediction\n'
+            header = infile.readline().strip().split(',')
+            header = ','.join(header[:-4]) + ',' + 'Prediction' + '\n'
             outfile.write(header)
             i = 0
             lines = infile.readlines()
             for line in lines:
-                columns = line.split(',')
+                columns = line.strip().split(',')
                 if y_pred[i]:
                     print('Commit: {} File: {} Method: {} Is: {}'.format(columns[1], columns[2], columns[3], y_pred[i]))
-                outfile.write('{},{}'.format(line, ('TRUE' if y_pred[i] else 'FALSE')))
+                    defective_methods += 1
+                buggy = 'TRUE' if y_pred[i] else 'FALSE'
+                outfile.write('{},{}\n'.format(','.join(columns[:-4]), buggy))
                 i += 1
+    print('Found {} defective methods'.format(defective_methods))
 
     print("\n*** Tester ended ***")
