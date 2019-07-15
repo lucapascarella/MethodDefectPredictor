@@ -50,7 +50,7 @@ def create_model(count):
     # First Layer
     model.add(Dense(count, activation=tf.nn.relu, kernel_initializer='random_normal', input_dim=count))
     # Second  Hidden Layer
-    # classifier.add(Dense(6, activation='relu', kernel_initializer='random_normal'))
+    model.add(Dense(20, activation='relu', kernel_initializer='random_normal'))
     # classifier.add(Dropout(rate=0.2))
     model.add(Dense(6, activation='relu', kernel_initializer='random_normal'))
     # Output Layer
@@ -70,7 +70,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, help='Local absolute or relative path to a valid CSV dataset.', default='data/method_metrics.csv')
-    parser.add_argument('-k', '--kfolds', type=str, help='Number of k-folds', default=1)
+    parser.add_argument('-k', '--kfolds', type=str, help='Number of k-folds', default=10)
     parser.add_argument('-s', '--save', type=str, help='Save model', default='data/model.h5')
     args, unknown = parser.parse_known_args()
 

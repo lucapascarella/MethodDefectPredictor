@@ -3,12 +3,13 @@ from typing import List, Dict, Tuple
 
 class MethodMetrics():
 
-    def __init__(self, source: str, src_start: int, src_stop: int, lines: Dict[str, List[Tuple[int, str]]], buggy: bool):
+    def __init__(self, source: str, src_start: int, src_stop: int, lines: Dict[str, List[Tuple[int, str]]], buggy: bool, fix: bool):
         self.source = source
         self.src_start = src_start
         self.src_stop = src_stop
         self.lines = lines
         self.buggy = buggy
+        self.fix = fix
 
     def get_method_source(self) -> str:
         src_lines = self.source.split('\n')
@@ -30,6 +31,11 @@ class MethodMetrics():
 
     def is_buggy(self):
         if self.buggy and self.is_touched():
+            return True
+        return False
+
+    def is_fix(self):
+        if self.fix and self.is_touched():
             return True
         return False
 
