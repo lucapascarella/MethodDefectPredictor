@@ -18,7 +18,7 @@ class MethodMetrics():
     def get_number_of_lines(self) -> int:
         return len(self.source.split('\n'))
 
-    def is_touched(self):
+    def is_touched(self) -> bool:
         added = self.lines['added']
         deleted = self.lines['deleted']
         for a_line, a_text in added:
@@ -29,12 +29,12 @@ class MethodMetrics():
                 return True
         return False
 
-    def is_buggy(self):
+    def is_buggy(self) -> bool:
         if self.buggy and self.is_touched():
             return True
         return False
 
-    def is_fix(self):
+    def is_fix(self) -> bool:
         if self.fix and self.is_touched():
             return True
         return False
