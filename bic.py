@@ -59,9 +59,11 @@ if __name__ == '__main__':
     input_columns = header.strip().split(args.delimiter)
 
     # Read commits to ignore
-    ignore_file = open(args.notuse, 'r', encoding="utf-8")
-    ignore_commits = ignore_file.readlines()
-    ignore_file.close()
+    ignore_commits = []
+    if args.notuse is not None:
+        ignore_file = open(args.notuse, 'r', encoding="utf-8")
+        ignore_commits = ignore_file.readlines()
+        ignore_file.close()
 
     # Prepare the column names for the output file
     # header = input_columns + ['git_timestamp', 'git_modifications', 'git_methods', 'bic_count', 'bic_commit', 'bic_timestamp', 'bic_modifications', 'bic_methods']
@@ -84,7 +86,7 @@ if __name__ == '__main__':
                     bic_mods = gr.get_commits_last_modified_lines(fix_commit, mod, hashes_to_ignore_path=args.notuse)
                 else:
                     bic_mods = gr.get_commits_last_modified_lines(fix_commit, mod)
-                print('{}) {} has {} MOD, {} BIC'.format(count, git_hash, len(bic_mods), get_bic_count(bic_mods)))
+                print('   ==> {} has {} MOD, {} BIC'.format(git_hash, len(bic_mods), get_bic_count(bic_mods)))
 
                 dout = {'git_timestamp': fix_commit.committer_date,
                         'git_modifications': len(fix_commit.modifications),
