@@ -13,7 +13,7 @@ from tensorflow.python.keras.layers import Dense, Dropout
 from sklearn.model_selection import StratifiedKFold
 from typing import List
 
-# from xgboost import XGBClassifier
+from xgboost import XGBClassifier
 
 
 def skipper(fname, header=False):
@@ -61,16 +61,16 @@ def create_tensorflow_model(count):
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     return model
 
-# def create_xgboost_model(count):
-#     # Define our classifier
-#     model = XGBClassifier()
-#     return model
+def create_xgboost_model(count):
+    # Define our classifier
+    model = XGBClassifier()
+    return model
 
 def create_model(type, count):
     if type == 'tensorflow':
         return create_tensorflow_model(count)
-    # elif type == 'xgboost':
-    #     return create_tensorflow_model(count)
+    elif type == 'xgboost':
+        return create_tensorflow_model(count)
     else:
         return None
 
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, help='Local absolute or relative path to a valid CSV dataset.', default='data/method_metrics.csv')
     parser.add_argument('-k', '--kfolds', type=str, help='Number of k-folds', default=1)
-    parser.add_argument('-t', '--type', type=str, help='Model type: tensorflow or xgboost', default='tensorflow')
+    parser.add_argument('-t', '--type', type=str, help='Model type: tensorflow or xgboost', default='xgboost')
     parser.add_argument('-s', '--save', type=str, help='Save model', default='data/model.h5')
     args, unknown = parser.parse_known_args()
 
