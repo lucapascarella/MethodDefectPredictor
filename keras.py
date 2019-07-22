@@ -13,6 +13,8 @@ from tensorflow.python.keras.layers import Dense, Dropout
 from sklearn.model_selection import StratifiedKFold
 from typing import List
 
+# from xgboost import XGBClassifier
+
 
 def skipper(fname, header=False):
     with open(fname) as fin:
@@ -44,7 +46,7 @@ def read_data(input_path: str) -> (List[List[float]], List[int]):
     return len(x[0]), x, y
 
 
-def create_model(count):
+def create_tensorflow_model(count):
     # Define our classifier
     model = Sequential()
     # First Layer
@@ -59,6 +61,18 @@ def create_model(count):
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     return model
 
+# def create_xgboost_model(count):
+#     # Define our classifier
+#     model = XGBClassifier()
+#     return model
+
+def create_model(type, count):
+    if type == 'tensorflow':
+        return create_tensorflow_model(count)
+    # elif type == 'xgboost':
+    #     return create_tensorflow_model(count)
+    else:
+        return None
 
 if __name__ == '__main__':
     print("*** Keras started ***\n")
@@ -70,7 +84,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, help='Local absolute or relative path to a valid CSV dataset.', default='data/method_metrics.csv')
-    parser.add_argument('-k', '--kfolds', type=str, help='Number of k-folds', default=10)
+    parser.add_argument('-k', '--kfolds', type=str, help='Number of k-folds', default=1)
+    parser.add_argument('-t', '--type', type=str, help='Model type: tensorflow or xgboost', default='tensorflow')
     parser.add_argument('-s', '--save', type=str, help='Save model', default='data/model.h5')
     args, unknown = parser.parse_known_args()
 
@@ -86,7 +101,7 @@ if __name__ == '__main__':
     if args.kfolds == 1:
         # Single training case
         x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3)
-        model = create_model(count)
+        model = create_model(args.type, count)
         # Fitting the data to the training dataset
         model.fit(x_train, y_train, batch_size=10, epochs=10, verbose=1)
         loss, accuracy = model.evaluate(x_test, y_test)
@@ -115,7 +130,7 @@ if __name__ == '__main__':
         scores = {'Accuracy': [], 'F-score': [], 'MCC': []}
         for train, test in kfold.split(x, y):
             # Split dataset in training and testing part
-            model = create_model(count)
+            model = create_model(args.type, count)
             # Fitting the data to the training dataset
             model.fit( x[train], y[train], batch_size=10, epochs=5, verbose=1)
             loss, accuracy = model.evaluate(x[test], y[test])
