@@ -1,6 +1,7 @@
 import argparse
 
 import numpy
+from sklearn.externals import joblib
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn import metrics
@@ -52,27 +53,22 @@ def create_tensorflow_model(count):
     # First Layer
     model.add(Dense(count, activation=tf.nn.relu, kernel_initializer='random_normal', input_dim=count))
     # Second  Hidden Layer
+    model.add(Dense(50, activation='relu', kernel_initializer='random_normal'))
+    # model.add(Dropout(rate=0.2))
     model.add(Dense(20, activation='relu', kernel_initializer='random_normal'))
-    # classifier.add(Dropout(rate=0.2))
-    model.add(Dense(6, activation='relu', kernel_initializer='random_normal'))
+    # model.add(Dense(6, activation='relu', kernel_initializer='random_normal'))
     # Output Layer
     model.add(Dense(1, activation='sigmoid', kernel_initializer='random_normal'))
     # Compiling the neural network
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     return model
 
-def create_xgboost_model(count):
+
+def create_xgboost_model():
     # Define our classifier
     model = XGBClassifier()
     return model
 
-def create_model(type, count):
-    if type == 'tensorflow':
-        return create_tensorflow_model(count)
-    elif type == 'xgboost':
-        return create_tensorflow_model(count)
-    else:
-        return None
 
 if __name__ == '__main__':
     print("*** Keras started ***\n")
@@ -101,12 +97,18 @@ if __name__ == '__main__':
     if args.kfolds == 1:
         # Single training case
         x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3)
-        model = create_model(args.type, count)
+
         # Fitting the data to the training dataset
-        model.fit(x_train, y_train, batch_size=10, epochs=10, verbose=1)
-        loss, accuracy = model.evaluate(x_test, y_test)
-        model.summary()
-        print('Loss: {:.2f} Accuracy: {:.2f}'.format(loss, accuracy))
+        if args.type == 'tensorflow':
+            model = create_tensorflow_model(count)
+            model.fit(x_train, y_train, batch_size=10, epochs=10, verbose=1)
+            loss, accuracy = model.evaluate(x_test, y_test)
+            model.summary()
+            print('Loss: {:.2f} Accuracy: {:.2f}'.format(loss, accuracy))
+        elif args.type == 'xgboost':
+            model = create_xgboost_model()
+            model.fit(x_train, y_train, verbose=1)
+
 
         y_pred = model.predict(x_test)
         y_pred = (y_pred > 0.5)
@@ -123,16 +125,19 @@ if __name__ == '__main__':
 
         # Save entire model to a HDF5 file
         if args.save is not None:
-            model.save(args.save)
+            if args.type == 'tensorflow':
+                model.save(args.save)
+            elif args.type == 'xgboost':
+                joblib.dump(model, args.save)
     else:
         # Use k-fold cross validation test harness
         kfold = StratifiedKFold(n_splits=args.kfolds, shuffle=True)
         scores = {'Accuracy': [], 'F-score': [], 'MCC': []}
         for train, test in kfold.split(x, y):
             # Split dataset in training and testing part
-            model = create_model(args.type, count)
+            model = create_tensorflow_model(count)
             # Fitting the data to the training dataset
-            model.fit( x[train], y[train], batch_size=10, epochs=5, verbose=1)
+            model.fit(x[train], y[train], batch_size=10, epochs=5, verbose=1)
             loss, accuracy = model.evaluate(x[test], y[test])
             # model.summary()
             print('Loss: {:.2f} Accuracy: {:.2f}'.format(loss, accuracy))

@@ -2,6 +2,7 @@ import argparse, os, numpy
 
 from sklearn.preprocessing import StandardScaler
 from miner import Miner
+from sklearn.externals import joblib
 from tensorflow import keras
 
 
@@ -21,8 +22,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--repo', type=str, help='Absolute GIT repository path', default=None)
     parser.add_argument('-e', '--ext', type=str, help='List of allowed extensions. Eg. .cpp .c', default='.cpp')
-    parser.add_argument('-s', '--start', type=str, help='Commit HASH to analyze', default='e226046cb8843580086117bafc060898cdcbee2f')
-    parser.add_argument('-p', '--stop', type=str, help='Stop HASH commit, if not specified it analyzes up to the end.', default='e6c57445435d378833e3e282d3f0aba3479f7733')
+    parser.add_argument('-s', '--start', type=str, help='Commit HASH to analyze', default='db6ecd1b6eb514cc5bf327d101d5cf861dd73926')
+    parser.add_argument('-p', '--stop', type=str, help='Stop HASH commit, if not specified it analyzes up to the end.', default='11fbfb6d5381726bbc55472bbf0b816d9859ee79')
     parser.add_argument('-o', '--output', type=str, help='Path of the CSV file where to save results.', default='data/testing_output.csv')
     parser.add_argument('-m', '--model', type=str, help='Path of the machine learning model.', default='data/model.h5')
     args, unknown = parser.parse_known_args()
@@ -38,9 +39,8 @@ if __name__ == '__main__':
         exit(-1)
 
     # Get method's metrics
-    miner = Miner(args.repo, args.ext)
-    metrics = miner.mine_methods(args.start, args.stop)
-    miner.print_metrics_per_method(temp1_csv, metrics)
+    miner = Miner(args.repo, args.ext, temp1_csv)
+    metrics = miner.mine_methods(args.stop, args.start)
 
     # Count the number of columns into which split dataset and filter out other commits
     fin = open(temp1_csv, mode='r')
@@ -50,13 +50,14 @@ if __name__ == '__main__':
     lines = fin.readlines()
     for line in lines:
         cols = line.split(',')
-        if cols[1] == args.start:
+        # Exclude other commits and not touched methods
+        if cols[1] == args.start: # and cols[77] == '1':
             fout.write(line)
     fin.close()
     fout.close()
 
     fin = open(temp2_csv, mode='r')
-    count = len(fin.readline().split(","))
+    count = len(fin.readline().split(','))
     fin.close()
 
     # Read the CSV file that contains fresh mined metrics
@@ -69,8 +70,9 @@ if __name__ == '__main__':
 
     # Load TensorFlow pre-trained model and perform a prediction
     print('Load trained model: ' + args.model)
-    model = keras.models.load_model(args.model)
-    model.summary()
+    # model = keras.models.load_model(args.model)
+    # model.summary()
+    model = joblib.load(args.model)
     y_pred = model.predict(x)
     y_pred = (y_pred > 0.5)
 

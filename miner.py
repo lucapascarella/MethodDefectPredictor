@@ -88,7 +88,7 @@ class Miner:
         count = 0
         print('Mining: ' + self.repo_path)
         gr = GitRepository(self.repo_path)
-        for commit in RepositoryMining(self.repo_path, from_commit=stop_commit, to_commit=start_commit, reversed_order=True, only_modifications_with_file_types=self.allowed_extensions).traverse_commits():
+        for commit in RepositoryMining(self.repo_path, from_commit=stop_commit, to_commit=first_commit, reversed_order=True, only_modifications_with_file_types=self.allowed_extensions).traverse_commits():
             buggy = True if commit.hash in self.bic_commits else False
             fix = True if commit.hash in self.fix_commits else False
             print('Methods: {:-8} | {:-7}/{:7} | Commit: {} Date: {} Mods: {:4} | Bug/Fix {} {}'.format(len(methods), count, commit_count, commit.hash, commit.author_date.strftime('%d/%m/%Y'), len(commit.modifications),
@@ -168,7 +168,7 @@ class Miner:
                  'method_general_fan_out_last,method_general_fan_out_max,method_general_fan_out_mean,method_general_fan_out_sum,' \
                  'method_parameters_counts_last,method_parameters_counts_max,method_parameters_counts_mean,method_parameters_counts_sum,' \
                  'author_email_mean,author_email_sum,' \
-                 'method_touched_sum,method_touched_mean,method_fixes_sum,method_fixes_mean,'\
+                 'method_touched_last,method_touched_sum,method_touched_mean,method_fixes_sum,method_fixes_mean,'\
                  'file_buggy,file_fix,method_bug_sum,method_bug_mean,method_fix,method_buggy\n'
         self.out_file.write(header)
 
@@ -335,6 +335,7 @@ class Miner:
         author_email_last = len(set(author_emails)) / len(method)
         author_email_sum = len(set(author_emails))
 
+        method_touched_last  = touches[0]
         method_touched_sum = sum(touches)
         method_touched_mean = sum(touches) / len(method)
 
@@ -367,7 +368,7 @@ class Miner:
                      '{},{},{},{},' \
  \
                      '{},{},' \
-                     '{},{},{},{},' \
+                     '{},{},{},{},{},' \
  \
                      '{},{},{},{},{},{}\n'.format(
             key.replace(',', '-comma-'), git_hash, file_name.replace(',', '-comma-'), method_name.replace(',', '-comma-'), file_rename_count, method_rename_count, change_type_count,
@@ -392,7 +393,7 @@ class Miner:
             method_parameters_counts_last, method_parameters_counts_max, method_parameters_counts_mean, method_parameters_counts_sum,
 
             author_email_last, author_email_sum,
-            method_touched_sum, method_touched_mean, method_fixes_sum, method_fixes_mean,
+            method_touched_last, method_touched_sum, method_touched_mean, method_fixes_sum, method_fixes_mean,
 
             (1 if file_buggy else 0), (1 if file_fix else 0), method_buggy_sum, method_buggy_mean, (1 if method_fix else 0), (1 if method_buggy else 0))
         self.out_file.write(out_string)
