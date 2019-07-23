@@ -80,7 +80,7 @@ class Miner:
         first_commit = start_commit
         if start_commit is None:
             first_commit = GitRepository(self.repo_path).get_head().hash
-        commit_count = MinerGit(self.repo_path).count_commits(first_commit, stop_commit)
+        commit_count = MinerGit(self.repo_path).count_commits(stop_commit, first_commit)
 
         self.create_csv_file(self.csv_file)
         self.print_csv_header()
@@ -106,38 +106,39 @@ class Miner:
                         methods = new_methods
 
                     for method in mod.methods:
-                        lines = gr.parse_diff(mod.diff)
-                        method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line, lines, buggy, fix)
-                        m_touched = method_metrics.is_touched()
-                        m_fix = method_metrics.is_fix()
-                        m_buggy = method_metrics.is_buggy()
-                        mb = MinerBean(commit.hash, commit.author_date, mod.new_path, method.name, mod.change_type.name,
-                                       len(commit.modifications), mod.added, mod.removed, mod.nloc, mod.complexity, mod.token_count,
-                                       len(mod.methods), method_metrics.get_added_lines(), method_metrics.get_removed_lines(), method.nloc, method.complexity, method.token_count,
-                                       buggy, fix,
-                                       method_metrics.get_number_of_lines(), method.fan_in, method.fan_out, method.general_fan_out, len(method.parameters),
-                                       commit.author.email,
-                                       m_touched, m_fix, m_buggy
-                                       )
                         if mod.new_path is not None and mod.new_path is not '':
                             key = mod.new_path + '$$' + method.name
                         elif mod.old_path is not None and mod.old_path is not '':
                             key = mod.old_path + '$$' + method.name
                         else:
-                            key = 'noise'
-                        # print('key: ' + key)
+                            key = 'unexpected_key'
 
-                        if filter_methods is None or key not in filter_methods:
+                        # For unwanted keys prevent metric calculation
+                        if filter_methods is None or key in filter_methods:
+                            lines = gr.parse_diff(mod.diff)
+                            method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line, lines, buggy, fix)
+                            m_touched = method_metrics.is_touched()
+                            m_fix = method_metrics.is_fix()
+                            m_buggy = method_metrics.is_buggy()
+                            mb = MinerBean(commit.hash, commit.author_date, mod.new_path, method.name, mod.change_type.name,
+                                           len(commit.modifications), mod.added, mod.removed, mod.nloc, mod.complexity, mod.token_count,
+                                           len(mod.methods), method_metrics.get_added_lines(), method_metrics.get_removed_lines(), method.nloc, method.complexity, method.token_count,
+                                           buggy, fix,
+                                           method_metrics.get_number_of_lines(), method.fan_in, method.fan_out, method.general_fan_out, len(method.parameters),
+                                           commit.author.email,
+                                           m_touched, m_fix, m_buggy
+                                           )
+
                             if key not in methods:
                                 methods[key] = []
                             methods.get(key, []).append(mb)
-                        # Going back in the past ADD is the moment in which the a file, consequently a method, is added therefore it can be removed from the disc and flushed into the CSV to save RAM
-                        if mod.change_type is ModificationType.ADD:
-                            m = methods.pop(key, None)
-                            if m is not None:
-                                self.add_method_to_csv(key, m)
-                            else:
-                                print('This key is not present into the dict: ' + key)
+                            # Going back in the past ADD is the moment in which the a file, consequently a method, is added therefore it can be removed from the disc and flushed into the CSV to save RAM
+                            if mod.change_type is ModificationType.ADD:
+                                m = methods.pop(key, None)
+                                if m is not None:
+                                    self.add_method_to_csv(key, m)
+                                else:
+                                    print('This key is not present into the dict: ' + key)
             count += 1
         for key, value in methods.items():
             self.add_method_to_csv(key, value)
@@ -168,7 +169,7 @@ class Miner:
                  'method_general_fan_out_last,method_general_fan_out_max,method_general_fan_out_mean,method_general_fan_out_sum,' \
                  'method_parameters_counts_last,method_parameters_counts_max,method_parameters_counts_mean,method_parameters_counts_sum,' \
                  'author_email_mean,author_email_sum,' \
-                 'method_touched_last,method_touched_sum,method_touched_mean,method_fixes_sum,method_fixes_mean,'\
+                 'method_touched_sum,method_touched_mean,method_fixes_sum,method_fixes_mean,'\
                  'file_buggy,file_fix,method_bug_sum,method_bug_mean,method_fix,method_buggy\n'
         self.out_file.write(header)
 
@@ -335,7 +336,7 @@ class Miner:
         author_email_last = len(set(author_emails)) / len(method)
         author_email_sum = len(set(author_emails))
 
-        method_touched_last  = touches[0]
+        # method_touched_last  = touches[0]
         method_touched_sum = sum(touches)
         method_touched_mean = sum(touches) / len(method)
 
@@ -368,7 +369,7 @@ class Miner:
                      '{},{},{},{},' \
  \
                      '{},{},' \
-                     '{},{},{},{},{},' \
+                     '{},{},{},{},' \
  \
                      '{},{},{},{},{},{}\n'.format(
             key.replace(',', '-comma-'), git_hash, file_name.replace(',', '-comma-'), method_name.replace(',', '-comma-'), file_rename_count, method_rename_count, change_type_count,
@@ -393,7 +394,7 @@ class Miner:
             method_parameters_counts_last, method_parameters_counts_max, method_parameters_counts_mean, method_parameters_counts_sum,
 
             author_email_last, author_email_sum,
-            method_touched_last, method_touched_sum, method_touched_mean, method_fixes_sum, method_fixes_mean,
+            method_touched_sum, method_touched_mean, method_fixes_sum, method_fixes_mean,
 
             (1 if file_buggy else 0), (1 if file_fix else 0), method_buggy_sum, method_buggy_mean, (1 if method_fix else 0), (1 if method_buggy else 0))
         self.out_file.write(out_string)

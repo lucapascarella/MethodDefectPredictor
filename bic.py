@@ -33,7 +33,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--repo', type=str, help='Local absolute or relative path to a valid GIT repository.', default=None)
     parser.add_argument('-c', '--csv', type=str, help='A CSV file that contains a list of commit fixes, the fix must be identified with a valid HASH belonging to the -r or --repo otion', default='data/fix_commits.csv')
-    parser.add_argument('-n', '--notuse', type=str, help='Absolute path of a text file that contains a list of commits, one per line, to ignore', default=None)  # 'data/ignore_commits.txt'
+    parser.add_argument('-n', '--notuse', type=str, help='ABSOLUTE path of a text file that contains a list of commits, one per line, to ignore', default=None)  # 'data/ignore_commits.txt'
     parser.add_argument('-d', '--delimiter', type=str, help='The CSV delimiter', default=',')
     parser.add_argument('-f', '--fix', type=str, help='The name of the column in the input CSV file used to identify the GIT HASH of a fix commit.', default='git_hash')
     parser.add_argument('-o', '--output', type=str, help='A CSV file where save bug inducing commits found with SZZ algorithm.', default='data/bic_commits.csv')

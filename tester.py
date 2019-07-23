@@ -29,7 +29,6 @@ if __name__ == '__main__':
     args, unknown = parser.parse_known_args()
 
     temp1_csv = 'temp1.csv'
-    temp2_csv = 'temp2.csv'
 
     if args.start is None or args.stop is None:
         print('A pair of commit HASHs must be passed as input!')
@@ -38,30 +37,25 @@ if __name__ == '__main__':
         print('A valid trained model must be passed ad input argument!')
         exit(-1)
 
-    # Get method's metrics
+    # Get a list of touched methods in the last commit
     miner = Miner(args.repo, args.ext, temp1_csv)
-    metrics = miner.mine_methods(args.stop, args.start)
+    metrics = miner.mine_methods(args.start, args.start)
+    allowed_methods = []
+    for key, val in metrics.items():
+        if val[0].method_touched == 1:
+            allowed_methods.append(key)
+    print('Check for ' + str(len(allowed_methods)) + ' methods')
 
-    # Count the number of columns into which split dataset and filter out other commits
+    # Calculate metrics for touched commits only up to stop commit
+    metrics = miner.mine_methods(args.stop, args.start, allowed_methods)
+
+    # Count the number of columns into which split dataset
     fin = open(temp1_csv, mode='r')
-    header = fin.readline()
-    fout = open(temp2_csv, mode='w')
-    fout.write(header)
-    lines = fin.readlines()
-    for line in lines:
-        cols = line.split(',')
-        # Exclude other commits and not touched methods
-        if cols[1] == args.start: # and cols[77] == '1':
-            fout.write(line)
-    fin.close()
-    fout.close()
-
-    fin = open(temp2_csv, mode='r')
     count = len(fin.readline().split(','))
     fin.close()
 
     # Read the CSV file that contains fresh mined metrics
-    dataset = numpy.loadtxt(skipper(temp2_csv, True), delimiter=",", usecols=(range(4, count - 4)))
+    dataset = numpy.loadtxt(skipper(temp1_csv, True), delimiter=",", usecols=(range(4, count - 4)))
     # split into input (X) and output (Y) variables
     x = dataset[:, :]
     # Standardizing the input feature
@@ -78,10 +72,10 @@ if __name__ == '__main__':
 
     # Read CSV file
     defective_methods = 0
-    with open(temp2_csv, mode='r') as infile:
+    with open(temp1_csv, mode='r') as infile:
         with open(args.output, mode='w') as outfile:
             header = infile.readline().strip().split(',')
-            header = ','.join(header[:-4]) + ',' + 'Prediction' + '\n'
+            header = ','.join(header[:-4]) + ',' + 'Prediction' + ',' + 'top_feature_1' + '\n'
             outfile.write(header)
             i = 0
             lines = infile.readlines()
