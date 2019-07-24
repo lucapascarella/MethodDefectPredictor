@@ -15,6 +15,8 @@ from sklearn.model_selection import StratifiedKFold
 from typing import List
 
 from xgboost import XGBClassifier
+import shap
+import matplotlib
 
 
 def skipper(fname, header=False):
@@ -24,6 +26,32 @@ def skipper(fname, header=False):
             next(no_comments, None)  # skip header
         for row in no_comments:
             yield row
+
+
+def get_human_readable_feature_names(features_as_header):
+
+    # for full_feature_name in feature_names:
+    #     type_, feature_name = full_feature_name.split("__", 1)
+    #
+    #     if type_ == "desc":
+    #         feature_name = f"Description contains '{feature_name}'"
+    #     elif type_ == "title":
+    #         feature_name = f"Title contains '{feature_name}'"
+    #     elif type_ == "first_comment":
+    #         feature_name = f"First comment contains '{feature_name}'"
+    #     elif type_ == "comments":
+    #         feature_name = f"Comments contain '{feature_name}'"
+    #     elif type_ == "text":
+    #         feature_name = f"Combined text contains '{feature_name}'"
+    #     elif type_ == "data":
+    #         if " in " in feature_name and feature_name.endswith("=True"):
+    #             feature_name = feature_name[: len(feature_name) - len("=True")]
+    #     else:
+    #         raise Exception(f"Unexpected feature type for: {full_feature_name}")
+    #
+    #     cleaned_feature_names.append(feature_name)
+
+    return features_as_header
 
 
 def read_data(input_path: str) -> (List[List[float]], List[int]):
@@ -37,6 +65,10 @@ def read_data(input_path: str) -> (List[List[float]], List[int]):
     usecols = list(range(4, count - 4))
     usecols.append(count - 1)
 
+    features = []
+    for i in usecols:
+        features.append(columns[i])
+
     dataset = numpy.loadtxt(skipper(input_path, True), delimiter=",", usecols=usecols)
     # split into input (X) and output (Y) variables
     x = dataset[:, 0:-1]
@@ -44,7 +76,7 @@ def read_data(input_path: str) -> (List[List[float]], List[int]):
     # standardizing the input feature
     # sc = StandardScaler()
     # x = sc.fit_transform(x)
-    return len(x[0]), x, y
+    return len(x[0]), features, x, y
 
 
 def create_tensorflow_model(count):
@@ -86,9 +118,11 @@ if __name__ == '__main__':
     args, unknown = parser.parse_known_args()
 
     # Read and split in X and Y data from CSV file
-    count, x, y = read_data(args.input)
+    count, features, x, y = read_data(args.input)
     print('Features count: ' + str(count))
     print('Instances count: ' + str(len(x)))
+
+    feature_names = get_human_readable_feature_names(features)
 
     # Standardizing the input feature
     sc = StandardScaler()
@@ -109,7 +143,6 @@ if __name__ == '__main__':
             model = create_xgboost_model()
             model.fit(x_train, y_train, verbose=1)
 
-
         y_pred = model.predict(x_test)
         y_pred = (y_pred > 0.5)
 
@@ -122,6 +155,22 @@ if __name__ == '__main__':
 
         mcc = metrics.matthews_corrcoef(y_test, y_pred)
         print('MCC: {0:.2f}'.format(mcc))
+
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(x_train)
+
+        shap.summary_plot(
+            shap_values,
+            x_train,
+            feature_names=feature_names,
+            # class_names=class_names,
+            plot_type="bar"
+            if not isinstance(shap_values, list)
+            else None,
+            show=False,
+        )
+
+        matplotlib.pyplot.savefig("feature_importance.png", bbox_inches="tight")
 
         # Save entire model to a HDF5 file
         if args.save is not None:

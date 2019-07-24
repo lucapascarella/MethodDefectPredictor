@@ -4,6 +4,7 @@ from sklearn.preprocessing import StandardScaler
 from miner import Miner
 from sklearn.externals import joblib
 from tensorflow import keras
+import shap
 
 
 def skipper(fname, header=False):
@@ -14,6 +15,27 @@ def skipper(fname, header=False):
         for row in no_comments:
             yield row
 
+def get_important_features(cutoff, shap_values):
+    # Calculate the values that represent the fraction of the model output variability attributable
+    # to each feature across the whole dataset.
+    shap_sums = shap_values.sum(0)
+    abs_shap_sums = numpy.abs(shap_values).sum(0)
+    rel_shap_sums = abs_shap_sums / abs_shap_sums.sum()
+
+    cut_off_value = cutoff * numpy.amax(rel_shap_sums)
+
+    # Get indices of features that pass the cut off value
+    top_feature_indices = numpy.where(rel_shap_sums >= cut_off_value)[0]
+    # Get the importance values of the top features from their indices
+    top_features = numpy.take(rel_shap_sums, top_feature_indices)
+    # Gets the sign of the importance from shap_sums as boolean
+    is_positive = (numpy.take(shap_sums, top_feature_indices)) >= 0
+    # Stack the importance, indices and shap_sums in a 2D array
+    top_features = numpy.column_stack((top_features, top_feature_indices, is_positive))
+    # Sort the array (in decreasing order of importance values)
+    top_features = top_features[top_features[:, 0].argsort()][::-1]
+
+    return top_features
 
 # Main
 if __name__ == '__main__':
@@ -69,6 +91,17 @@ if __name__ == '__main__':
     model = joblib.load(args.model)
     y_pred = model.predict(x)
     y_pred = (y_pred > 0.5)
+
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(x)
+
+    if isinstance(shap_values, list):
+        shap_values = numpy.sum(numpy.abs(shap_values), axis=0)
+
+    importance_cutoff = 0.15
+    top_importances = get_important_features(importance_cutoff, shap_values)
+
+    top_indexes = [int(index) for importance, index, is_positive in top_importances]
 
     # Read CSV file
     defective_methods = 0
