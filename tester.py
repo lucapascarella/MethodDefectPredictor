@@ -15,6 +15,7 @@ def skipper(fname, header=False):
         for row in no_comments:
             yield row
 
+
 def get_important_features(cutoff, shap_values):
     # Calculate the values that represent the fraction of the model output variability attributable
     # to each feature across the whole dataset.
@@ -36,6 +37,7 @@ def get_important_features(cutoff, shap_values):
     top_features = top_features[top_features[:, 0].argsort()][::-1]
 
     return top_features
+
 
 # Main
 if __name__ == '__main__':
@@ -59,25 +61,27 @@ if __name__ == '__main__':
         print('A valid trained model must be passed ad input argument!')
         exit(-1)
 
-    # Get a list of touched methods in the last commit
-    miner = Miner(args.repo, args.ext, temp1_csv)
-    metrics = miner.mine_methods(args.start, args.start)
-    allowed_methods = []
-    for key, val in metrics.items():
-        if val[0].method_touched == 1:
-            allowed_methods.append(key)
-    print('Check for ' + str(len(allowed_methods)) + ' methods')
-
-    # Calculate metrics for touched commits only up to stop commit
-    metrics = miner.mine_methods(args.stop, args.start, allowed_methods)
+    # # Get a list of touched methods in the last commit
+    # miner = Miner(args.repo, args.ext, temp1_csv)
+    # metrics = miner.mine_methods(args.start, args.start)
+    # allowed_methods = []
+    # for key, val in metrics.items():
+    #     if val[0].method_touched == 1:
+    #         allowed_methods.append(key)
+    # print('Check for ' + str(len(allowed_methods)) + ' methods')
+    #
+    # # Calculate metrics for touched commits only up to stop commit
+    # metrics = miner.mine_methods(args.stop, args.start, allowed_methods)
 
     # Count the number of columns into which split dataset
     fin = open(temp1_csv, mode='r')
-    count = len(fin.readline().split(','))
+    header = fin.readline()
+    features = header.split(',')
+    count = len(features)
     fin.close()
 
     # Read the CSV file that contains fresh mined metrics
-    dataset = numpy.loadtxt(skipper(temp1_csv, True), delimiter=",", usecols=(range(4, count - 4)))
+    dataset = numpy.loadtxt(skipper(temp1_csv, True), delimiter=",", usecols=(range(4, count - 10)))
     # split into input (X) and output (Y) variables
     x = dataset[:, :]
     # Standardizing the input feature
@@ -103,6 +107,8 @@ if __name__ == '__main__':
 
     top_indexes = [int(index) for importance, index, is_positive in top_importances]
 
+    top_feature = features[top_indexes[0] + 4]
+
     # Read CSV file
     defective_methods = 0
     with open(temp1_csv, mode='r') as infile:
@@ -118,7 +124,7 @@ if __name__ == '__main__':
                     print('Commit: {} File: {} Method: {} Is: {}'.format(columns[1], columns[2], columns[3], y_pred[i]))
                     defective_methods += 1
                 buggy = 'TRUE' if y_pred[i] else 'FALSE'
-                outfile.write('{},{}\n'.format(','.join(columns[:-4]), buggy))
+                outfile.write('{},{},{}\n'.format(','.join(columns[:-4]), buggy, top_feature))
                 i += 1
     print('Found {} defective methods'.format(defective_methods))
 
