@@ -46,10 +46,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--repo', type=str, help='Absolute GIT repository path', default=None)
     parser.add_argument('-e', '--ext', type=str, help='List of allowed extensions. Eg. .cpp .c', default='.cpp')
-    parser.add_argument('-s', '--start', type=str, help='Commit HASH to analyze', default='db6ecd1b6eb514cc5bf327d101d5cf861dd73926')
-    parser.add_argument('-p', '--stop', type=str, help='Stop HASH commit, if not specified it analyzes up to the end.', default='11fbfb6d5381726bbc55472bbf0b816d9859ee79')
+    parser.add_argument('-s', '--start', type=str, help='Commit HASH to analyze', default='e1d724d2f50763136a691752a09a929fa3e6d2dc')
+    parser.add_argument('-p', '--stop', type=str, help='Stop HASH commit, if not specified it analyzes up to the end.', default='3a01a56056138755d0efa832a76321295c680601')
     parser.add_argument('-o', '--output', type=str, help='Path of the CSV file where to save results.', default='data/testing_output.csv')
-    parser.add_argument('-m', '--model', type=str, help='Path of the machine learning model.', default='data/model.h5')
+    parser.add_argument('-m', '--model', type=str, help='Path of the machine learning model.', default='data/joblib.dump')
     args, unknown = parser.parse_known_args()
 
     temp1_csv = 'temp1.csv'
@@ -61,17 +61,17 @@ if __name__ == '__main__':
         print('A valid trained model must be passed ad input argument!')
         exit(-1)
 
-    # # Get a list of touched methods in the last commit
-    # miner = Miner(args.repo, args.ext, temp1_csv)
-    # metrics = miner.mine_methods(args.start, args.start)
-    # allowed_methods = []
-    # for key, val in metrics.items():
-    #     if val[0].method_touched == 1:
-    #         allowed_methods.append(key)
-    # print('Check for ' + str(len(allowed_methods)) + ' methods')
-    #
-    # # Calculate metrics for touched commits only up to stop commit
-    # metrics = miner.mine_methods(args.stop, args.start, allowed_methods)
+    # Get a list of touched methods in the last commit
+    miner = Miner(args.repo, args.ext, temp1_csv)
+    metrics = miner.mine_methods(args.start, args.start)
+    allowed_methods = []
+    for key, val in metrics.items():
+        if val[0].method_touched == 1:
+            allowed_methods.append(key)
+    print('Check for ' + str(len(allowed_methods)) + ' methods')
+
+    # Calculate metrics for touched commits only up to stop commit
+    metrics = miner.mine_methods(args.start, args.stop, allowed_methods)
 
     # Count the number of columns into which split dataset
     fin = open(temp1_csv, mode='r')
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     fin.close()
 
     # Read the CSV file that contains fresh mined metrics
-    dataset = numpy.loadtxt(skipper(temp1_csv, True), delimiter=",", usecols=(range(4, count - 10)))
+    dataset = numpy.loadtxt(skipper(temp1_csv, True), delimiter=",", usecols=(range(4, count - 8)))
     # split into input (X) and output (Y) variables
     x = dataset[:, :]
     # Standardizing the input feature

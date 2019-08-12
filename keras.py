@@ -1,7 +1,6 @@
 import argparse
 
-import numpy
-from sklearn.externals import joblib
+import numpy, joblib
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn import metrics
@@ -62,7 +61,7 @@ def read_data(input_path: str) -> (List[List[float]], List[int]):
     fin.close()
 
     # Select only metrics and buggy columns
-    usecols = list(range(4, count - 4))
+    usecols = list(range(4, count - 8))
     usecols.append(count - 1)
 
     features = []
@@ -111,7 +110,7 @@ if __name__ == '__main__':
     print('Is eager enabled: ' + str(tf.executing_eagerly()))
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', type=str, help='Local absolute or relative path to a valid CSV dataset.', default='data/method_metrics.csv')
+    parser.add_argument('-i', '--input', type=str, help='Local absolute or relative path to a valid CSV dataset.', default='data/method_metrics_gecko-dev.csv')
     parser.add_argument('-k', '--kfolds', type=str, help='Number of k-folds', default=1)
     parser.add_argument('-t', '--type', type=str, help='Model type: tensorflow or xgboost', default='xgboost')
     parser.add_argument('-s', '--save', type=str, help='Save model', default='data/model.h5')
@@ -156,28 +155,29 @@ if __name__ == '__main__':
         mcc = metrics.matthews_corrcoef(y_test, y_pred)
         print('MCC: {0:.2f}'.format(mcc))
 
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(x_train)
+        if args.type == 'xgboost':
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(x_train)
 
-        shap.summary_plot(
-            shap_values,
-            x_train,
-            feature_names=feature_names,
-            # class_names=class_names,
-            plot_type="bar"
-            if not isinstance(shap_values, list)
-            else None,
-            show=False,
-        )
+            shap.summary_plot(
+                shap_values,
+                x_train,
+                feature_names=feature_names,
+                # class_names=class_names,
+                plot_type="bar"
+                if not isinstance(shap_values, list)
+                else None,
+                show=False,
+            )
 
-        matplotlib.pyplot.savefig("feature_importance.png", bbox_inches="tight")
+            matplotlib.pyplot.savefig("feature_importance.png", bbox_inches="tight")
 
         # Save entire model to a HDF5 file
         if args.save is not None:
             if args.type == 'tensorflow':
                 model.save(args.save)
             elif args.type == 'xgboost':
-                joblib.dump(model, args.save)
+                joblib.dump(model, 'data/joblib.dump')
     else:
         # Use k-fold cross validation test harness
         kfold = StratifiedKFold(n_splits=args.kfolds, shuffle=True)
