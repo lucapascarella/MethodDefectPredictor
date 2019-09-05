@@ -7,7 +7,7 @@ from method_metrics import MethodMetrics
 
 
 class MinerBean:
-    def __init__(self, git_hash: str, git_commiter_date: datetime, file_name: str, method_name: str, change_type: str,
+    def __init__(self, git_hash: str, git_commiter_date: datetime, file_name: str, method_name: str, method_start_line: int, change_type: str,
                  file_count: int, file_added: int, file_removed: int, file_nloc: int, file_comp: int, file_token_count: int,
                  method_count: int, method_added: int, method_removed: int, method_nlco: int, method_comp: int, method_token: int,
                  file_buggy: bool, file_fix: bool,
@@ -18,6 +18,7 @@ class MinerBean:
         self.git_commiter_date = git_commiter_date
         self.file_name = file_name
         self.method_name = method_name
+        self.method_start_line = method_start_line
         self.change_type = change_type
 
         self.file_count = file_count
@@ -120,7 +121,7 @@ class Miner:
                             m_touched = method_metrics.is_touched()
                             m_fix = method_metrics.is_fix()
                             m_buggy = method_metrics.is_buggy()
-                            mb = MinerBean(commit.hash, commit.author_date, mod.new_path, method.name, mod.change_type.name,
+                            mb = MinerBean(commit.hash, commit.author_date, mod.new_path, method.name, method.start_line, mod.change_type.name,
                                            len(commit.modifications), mod.added, mod.removed, mod.nloc, mod.complexity, mod.token_count,
                                            len(mod.methods), method_metrics.get_added_lines(), method_metrics.get_removed_lines(), method.nloc, method.complexity, method.token_count,
                                            buggy, fix,
@@ -150,7 +151,7 @@ class Miner:
         self.out_file = open(csv_path, 'w')
 
     def print_csv_header(self):
-        header = 'key,git_hash,file_name,method_name,file_rename_count,method_rename_count,change_type_count,' \
+        header = 'key,git_hash,file_name,method_name,method_start_line,file_rename_count,method_rename_count,change_type_count,' \
                  'file_count_last,file_count_max,file_count_mean,file_count_sum,' \
                  'file_added_last,file_added_max,file_added_mean,file_added_sum,' \
                  'file_removed_last,file_removed_max,file_removed_mean,file_removed_sum,' \
@@ -178,6 +179,7 @@ class Miner:
         # git_hashs = []
         file_names = []
         method_names = []
+        method_start_lines = []
         change_types = []
         file_counts = []
         file_addeds = []
@@ -207,6 +209,7 @@ class Miner:
         file_buggy = method[0].file_buggy
         file_fix = method[0].file_fix
         method_name = method[0].method_name
+        method_start_line = method[0].method_start_line
         method_touched = method[0].method_touched
         method_fix = method[0].method_fix
         method_buggy = method[0].method_buggy
@@ -372,7 +375,7 @@ class Miner:
                      '{},{},{},{},' \
  \
                      '{},{},{},{},{},{}\n'.format(
-            key.replace(',', '-comma-'), git_hash, file_name.replace(',', '-comma-'), method_name.replace(',', '-comma-'), file_rename_count, method_rename_count, change_type_count,
+            key.replace(',', '-comma-'), git_hash, file_name.replace(',', '-comma-'), method_name.replace(',', '-comma-'), method_start_line, file_rename_count, method_rename_count, change_type_count,
 
             file_count_last, file_count_max, file_count_mean, file_count_sum,
             file_added_last, file_added_max, file_added_mean, file_added_sum,
