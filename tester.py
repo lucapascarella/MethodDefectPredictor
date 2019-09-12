@@ -81,7 +81,7 @@ if __name__ == '__main__':
     fin.close()
 
     # Read the CSV file that contains fresh mined metrics
-    dataset = numpy.loadtxt(skipper(temp1_csv, True), delimiter=",", usecols=(range(4, count - 8)))
+    dataset = numpy.loadtxt(skipper(temp1_csv, True), delimiter=",", usecols=(range(5, count - 8)))
     # split into input (X) and output (Y) variables
     x = dataset[:, :]
     # Standardizing the input feature

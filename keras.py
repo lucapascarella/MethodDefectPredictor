@@ -61,7 +61,7 @@ def read_data(input_path: str) -> (List[List[float]], List[int]):
     fin.close()
 
     # Select only metrics and buggy columns
-    usecols = list(range(4, count - 8))
+    usecols = list(range(5, count - 8))
     usecols.append(count - 1)
 
     features = []
