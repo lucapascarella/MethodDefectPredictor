@@ -32,7 +32,7 @@ if __name__ == '__main__':
     print("*** BIC started ***\n")
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--repo', type=str, help='Local absolute or relative path to a valid GIT repository.', default=None)
-    parser.add_argument('-c', '--csv', type=str, help='A CSV file that contains a list of commit fixes, the fix must be identified with a valid HASH belonging to the -r or --repo otion', default='data/fix_commits.csv')
+    parser.add_argument('-c', '--csv', type=str, help='A CSV file that contains a list of commit fixes, the fix must be identified with a valid HASH belonging to the -r or --repo option', default='data/fix_commits.csv')
     parser.add_argument('-n', '--notuse', type=str, help='ABSOLUTE path of a text file that contains a list of commits, one per line, to ignore', default=None)  # 'data/ignore_commits.txt'
     parser.add_argument('-d', '--delimiter', type=str, help='The CSV delimiter', default=',')
     parser.add_argument('-f', '--fix', type=str, help='The name of the column in the input CSV file used to identify the GIT HASH of a fix commit.', default='git_hash')
@@ -66,7 +66,6 @@ if __name__ == '__main__':
         ignore_file.close()
 
     # Prepare the column names for the output file
-    # header = input_columns + ['git_timestamp', 'git_modifications', 'git_methods', 'bic_count', 'bic_commit', 'bic_timestamp', 'bic_modifications', 'bic_methods']
     header = input_columns + ['git_timestamp', 'git_modifications', 'git_methods', 'fix_added', 'fix_removed', 'bic_count', 'bic_commit', 'bic_path', 'bic_timestamp', 'bic_modifications']
     out_file = open(args.output, 'w', newline='', encoding="utf-8")
     writer = csv.DictWriter(out_file, delimiter=args.delimiter, fieldnames=header)

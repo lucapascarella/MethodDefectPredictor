@@ -3,6 +3,7 @@ import statistics as st
 from typing import List, Dict, Set
 from pydriller import RepositoryMining, GitRepository
 from pydriller.domain.commit import ModificationType
+
 from method_metrics import MethodMetrics
 
 
@@ -170,7 +171,7 @@ class Miner:
                  'method_general_fan_out_last,method_general_fan_out_max,method_general_fan_out_mean,method_general_fan_out_sum,' \
                  'method_parameters_counts_last,method_parameters_counts_max,method_parameters_counts_mean,method_parameters_counts_sum,' \
                  'author_email_mean,author_email_sum,' \
-                 'method_touched_sum,method_touched_mean,method_fixes_sum,method_fixes_mean,'\
+                 'method_touched_sum,method_touched_mean,method_fixes_sum,method_fixes_mean,' \
                  'file_buggy,file_fix,method_bug_sum,method_bug_mean,method_fix,method_buggy\n'
         self.out_file.write(header)
 
@@ -216,33 +217,39 @@ class Miner:
 
         # List of process metrics
         for n in range(0, len(method)):
-            # git_hashs.append(method[n].git_hash)
-            file_names.append(method[n].file_name)
-            method_names.append(method[n].method_name)
-            change_types.append(method[n].change_type)
-            file_counts.append(method[n].file_count)
-            file_addeds.append(method[n].file_added)
-            file_removeds.append(method[n].file_removed)
-            file_nlocs.append(method[n].file_nloc)
-            file_comps.append(method[n].file_comp)
-            file_token_counts.append(method[n].file_token_count)
-            # Method
-            method_counts.append(method[n].method_count)
-            method_addeds.append(method[n].method_added)
-            method_removeds.append(method[n].method_removed)
-            method_nlcos.append(method[n].method_nloc)
-            method_comps.append(method[n].method_comp)
-            method_tokens.append(method[n].method_token)
-            method_number_of_lines.append(method[n].method_number_of_lines)
-            method_fan_ins.append(method[n].method_fan_in)
-            method_fan_outs.append(method[n].method_fan_out)
-            method_general_fan_outs.append(method[n].method_general_fan_out)
-            method_parameters_counts.append(method[n].method_parameters_count)
-            author_emails.append(method[n].author_email)
+            start_time = method[n].git_commiter_date
+            stop_time = method[len(method) - 1].git_commiter_date
+            diff_time = abs(start_time - stop_time)
+            if diff_time.total_seconds() < 10368000:  # Reduce analysis to 4 Months only
+                # git_hashs.append(method[n].git_hash)
+                file_names.append(method[n].file_name)
+                method_names.append(method[n].method_name)
+                change_types.append(method[n].change_type)
+                file_counts.append(method[n].file_count)
+                file_addeds.append(method[n].file_added)
+                file_removeds.append(method[n].file_removed)
+                file_nlocs.append(method[n].file_nloc)
+                file_comps.append(method[n].file_comp)
+                file_token_counts.append(method[n].file_token_count)
+                # Method
+                method_counts.append(method[n].method_count)
+                method_addeds.append(method[n].method_added)
+                method_removeds.append(method[n].method_removed)
+                method_nlcos.append(method[n].method_nloc)
+                method_comps.append(method[n].method_comp)
+                method_tokens.append(method[n].method_token)
+                method_number_of_lines.append(method[n].method_number_of_lines)
+                method_fan_ins.append(method[n].method_fan_in)
+                method_fan_outs.append(method[n].method_fan_out)
+                method_general_fan_outs.append(method[n].method_general_fan_out)
+                method_parameters_counts.append(method[n].method_parameters_count)
+                author_emails.append(method[n].author_email)
 
-            touches.append(int(method[n].method_touched))
-            fixes.append(int(method[n].method_fix))
-            buggys.append(int(method[n].method_buggy))
+                touches.append(int(method[n].method_touched))
+                fixes.append(int(method[n].method_fix))
+                buggys.append(int(method[n].method_buggy))
+            else:
+                print("Discarded!!!!")
 
         # Other process metrics
         file_rename_count = len(set(file_names))
@@ -336,18 +343,18 @@ class Miner:
         method_parameters_counts_mean = st.mean(method_parameters_counts)
         method_parameters_counts_sum = sum(method_parameters_counts)
 
-        author_email_last = len(set(author_emails)) / len(method)
+        author_email_last = len(set(author_emails)) / len(author_emails)
         author_email_sum = len(set(author_emails))
 
         # method_touched_last  = touches[0]
         method_touched_sum = sum(touches)
-        method_touched_mean = sum(touches) / len(method)
+        method_touched_mean = sum(touches) / len(touches)
 
         method_fixes_sum = sum(fixes)
-        method_fixes_mean = sum(fixes) / len(method)
+        method_fixes_mean = sum(fixes) / len(fixes)
 
         method_buggy_sum = sum(buggys)
-        method_buggy_mean = sum(buggys) / len(method)
+        method_buggy_mean = sum(buggys) / len(buggys)
 
         # Append process metrics to CSV file
         out_string = '{},{},{},{},{},{},{},' \
