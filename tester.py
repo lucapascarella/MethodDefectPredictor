@@ -44,8 +44,8 @@ if __name__ == '__main__':
     print("*** Tester started ***\n")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-r', '--repo', type=str, help='Absolute GIT repository path', default=None)
-    parser.add_argument('-e', '--ext', type=str, help='List of allowed extensions. Eg. .cpp .c', default='.cpp')
+    parser.add_argument('-r', '--repo', type=str, help='Absolute path of a GIT repository.', default=None)
+    parser.add_argument('-e', '--ext', type=str, help='List of allowed file extensions. Eg. .cpp .c', default='.cpp')
     parser.add_argument('-s', '--start', type=str, help='Commit HASH to analyze', default='91efc5a86caadc97d087869129441f9d6c4e4bf9')
     parser.add_argument('-p', '--stop', type=str, help='Stop HASH commit, if not specified it analyzes up to the end.', default='be898d03269ba282bea19d90643adaf09ec21de2')
     parser.add_argument('-o', '--output', type=str, help='Path of the CSV file where to save results.', default='data/testing_output.csv')
