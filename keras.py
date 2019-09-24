@@ -61,7 +61,8 @@ def read_data(input_path: str) -> (List[List[float]], List[int]):
     fin.close()
 
     # Select only metrics and buggy columns
-    usecols = list(range(5, count - 8))
+    # usecols = list(range(5, count - 8))
+    usecols = list(range(4, count - 8)) # Reset to 5 when a new dataset will build
     usecols.append(count - 1)
 
     features = []
@@ -164,7 +165,7 @@ if __name__ == '__main__':
                 x_train,
                 feature_names=feature_names,
                 # class_names=class_names,
-                plot_type="bar"
+                plot_type="violin"
                 if not isinstance(shap_values, list)
                 else None,
                 show=False,

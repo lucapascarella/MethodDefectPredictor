@@ -7,7 +7,7 @@ from tensorflow import keras
 import shap
 
 
-def skipper(fname, header=False):
+def skipper(fname: str, header=False):
     with open(fname) as fin:
         no_comments = (line for line in fin if not line.lstrip().startswith('#'))
         if header:
@@ -46,13 +46,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--repo', type=str, help='Absolute GIT repository path', default=None)
     parser.add_argument('-e', '--ext', type=str, help='List of allowed extensions. Eg. .cpp .c', default='.cpp')
-    parser.add_argument('-s', '--start', type=str, help='Commit HASH to analyze', default='e1d724d2f50763136a691752a09a929fa3e6d2dc')
-    parser.add_argument('-p', '--stop', type=str, help='Stop HASH commit, if not specified it analyzes up to the end.', default='3a01a56056138755d0efa832a76321295c680601')
+    parser.add_argument('-s', '--start', type=str, help='Commit HASH to analyze', default='91efc5a86caadc97d087869129441f9d6c4e4bf9')
+    parser.add_argument('-p', '--stop', type=str, help='Stop HASH commit, if not specified it analyzes up to the end.', default='be898d03269ba282bea19d90643adaf09ec21de2')
     parser.add_argument('-o', '--output', type=str, help='Path of the CSV file where to save results.', default='data/testing_output.csv')
     parser.add_argument('-m', '--model', type=str, help='Path of the machine learning model.', default='data/joblib.dump')
     args, unknown = parser.parse_known_args()
 
-    temp1_csv = 'temp1.csv'
+    temp_csv = 'temp.csv'
 
     if args.start is None or args.stop is None:
         print('A pair of commit HASHs must be passed as input!')
@@ -62,26 +62,32 @@ if __name__ == '__main__':
         exit(-1)
 
     # Get a list of touched methods in the last commit
-    miner = Miner(args.repo, args.ext, temp1_csv)
-    metrics = miner.mine_methods(args.start, args.start)
-    allowed_methods = []
-    for key, val in metrics.items():
-        if val[0].method_touched == 1:
-            allowed_methods.append(key)
-    print('Check for ' + str(len(allowed_methods)) + ' methods')
-
-    # Calculate metrics for touched commits only up to stop commit
-    metrics = miner.mine_methods(args.start, args.stop, allowed_methods)
+    miner = Miner(args.repo, args.ext, temp_csv)
+    methods = miner.mine_methods(args.start, args.start)
 
     # Count the number of columns into which split dataset
-    fin = open(temp1_csv, mode='r')
+    fin = open(temp_csv, mode='r')
     header = fin.readline()
     features = header.split(',')
-    count = len(features)
+    column_count = len(features)
+
+    # Read remaining rows to extract files and methods
+    allowed_methods = set()
+    allowed_files = set()
+    for line in fin.readlines():
+        cols = line.split(',')
+        touched = int(cols[78])  # Touched sum (this is a binary value since only one commit is inspected)
+        if touched > 0:
+            allowed_methods.add(cols[0])  # Entire key
+            allowed_files.add(cols[2])  # Full paths
     fin.close()
+    print('Check for ' + str(len(allowed_methods)) + ' methods in ' + str(len(allowed_files)) + ' files')
+
+    # Calculate metrics for touched commits only up to stop commit
+    miner.mine_methods(args.start, args.stop, allowed_methods, allowed_files)
 
     # Read the CSV file that contains fresh mined metrics
-    dataset = numpy.loadtxt(skipper(temp1_csv, True), delimiter=",", usecols=(range(5, count - 8)))
+    dataset = numpy.loadtxt(skipper(temp_csv, True), delimiter=",", usecols=(range(5, column_count - 8)))
     # split into input (X) and output (Y) variables
     x = dataset[:, :]
     # Standardizing the input feature
@@ -107,14 +113,18 @@ if __name__ == '__main__':
 
     top_indexes = [int(index) for importance, index, is_positive in top_importances]
 
-    top_feature = features[top_indexes[0] + 4]
+    top_1_feature = features[top_indexes[0] + 5]
+    top_2_feature = features[top_indexes[1] + 5]
+    top_3_feature = features[top_indexes[2] + 5]
+    top_4_feature = features[top_indexes[3] + 5]
+    top_5_feature = features[top_indexes[4] + 5]
 
     # Read CSV file
     defective_methods = 0
-    with open(temp1_csv, mode='r') as infile:
+    with open(temp_csv, mode='r') as infile:
         with open(args.output, mode='w') as outfile:
             header = infile.readline().strip().split(',')
-            header = ','.join(header[:-4]) + ',' + 'Prediction' + ',' + 'top_feature_1' + '\n'
+            header = ','.join(header[:-4]) + ',' + 'Prediction' + ',' + 'top_feature_1' + 'top_feature_2' + 'top_feature_3' + 'top_feature_4' + 'top_feature_5' + '\n'
             outfile.write(header)
             i = 0
             lines = infile.readlines()
@@ -124,7 +134,7 @@ if __name__ == '__main__':
                     print('Commit: {} File: {} Method: {} Is: {}'.format(columns[1], columns[2], columns[3], y_pred[i]))
                     defective_methods += 1
                 buggy = 'TRUE' if y_pred[i] else 'FALSE'
-                outfile.write('{},{},{}\n'.format(','.join(columns[:-4]), buggy, top_feature))
+                outfile.write('{},{},{},{},{},{},{}\n'.format(','.join(columns[:-4]), buggy, top_1_feature, top_2_feature, top_3_feature, top_4_feature, top_5_feature))
                 i += 1
     print('Found {} defective methods'.format(defective_methods))
 

@@ -43,7 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--fix', type=str, help='Path of the CSV file containing the list of bug inducing commits', default=None)
     parser.add_argument('-bn', '--bic_name', type=str, help='The name of the column in the input CSV file used to identify the GIT HASH of a bic commit.', default='bic_commit')
     parser.add_argument('-fn', '--fix_name', type=str, help='The name of the column in the input CSV file used to identify the GIT HASH of a bic commit.', default='git_hash')
-    parser.add_argument('-o', '--output', type=str, help='Path of the CSV file where to save results.', default='data/method_metrics_test.csv')
+    parser.add_argument('-o', '--output', type=str, help='Path of the CSV file where to save results.', default='data/method_metrics_geko-dev-2.csv')
     args, unknown = parser.parse_known_args()
 
     # Check that a valid repos is specified

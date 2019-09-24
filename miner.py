@@ -8,7 +8,7 @@ from method_metrics import MethodMetrics
 
 
 class MinerBean:
-    def __init__(self, git_hash: str, git_commiter_date: datetime, file_name: str, method_name: str, method_start_line: int, change_type: str,
+    def __init__(self, git_hash: str, git_committer_date: datetime, file_name: str, method_name: str, method_start_line: int, change_type: str,
                  file_count: int, file_added: int, file_removed: int, file_nloc: int, file_comp: int, file_token_count: int,
                  method_count: int, method_added: int, method_removed: int, method_nlco: int, method_comp: int, method_token: int,
                  file_buggy: bool, file_fix: bool,
@@ -16,7 +16,7 @@ class MinerBean:
                  author_email: str,
                  method_touched: bool, method_fix: bool, method_buggy: bool):
         self.git_hash = git_hash
-        self.git_commiter_date = git_commiter_date
+        self.git_committer_date = git_committer_date
         self.file_name = file_name
         self.method_name = method_name
         self.method_start_line = method_start_line
@@ -50,18 +50,6 @@ class MinerBean:
         self.method_buggy = method_buggy
 
 
-class MinerGit:
-    def __init__(self, repo_path):
-        self.repo_path = repo_path
-
-    def count_commits(self, recent_commit: str, oldest_commit: str) -> int:
-        cmd = 'git -C ' + self.repo_path + ' rev-list ' + recent_commit + ' ^' + oldest_commit + ' --count'
-        ret = os.popen(cmd).read()
-        if ret.strip().isdigit():
-            return int(ret)
-        return 0
-
-
 class Miner:
     def __init__(self, repo_path: str, allowed_extensions: List[str], csv_path: str, bic_commits: Set[str] = [str], fix_commits: Set[str] = [str]):
         if repo_path is None:
@@ -77,88 +65,131 @@ class Miner:
             print('The following path does not exist: ' + repo_path)
             exit(-1)
 
-    def mine_methods(self, start_commit: str, stop_commit: str, filter_methods: List[str] = None) -> Dict[str, List[MinerBean]]:
-        methods = {}
+    def mine_methods(self, start_commit: str, stop_commit: str, filter_methods: Set[str] = None, filter_files: Set[str] = None) -> Dict[str, List[MinerBean]]:
+        methods = {}  # Dict[str, List[MinerBean]]
+        commits_to_analyze = -1
+        print('Mining: ' + self.repo_path)
+        gr = GitRepository(self.repo_path)
+
+        # Redefine start and stop commits
+        print('Adjust start and stop commits.')
         first_commit = start_commit
         if start_commit is None:
-            first_commit = GitRepository(self.repo_path).get_head().hash
-        commit_count = MinerGit(self.repo_path).count_commits(stop_commit, first_commit)
+            first_commit = gr.get_head().hash
+        last_commit = stop_commit
 
+        # Print start and stop commits info
+        c1 = gr.get_commit(first_commit)
+        print('Start: {} Author date: {} Committer date: {}'.format(c1.hash, c1.author_date, c1.committer_date))
+        c2 = gr.get_commit(last_commit)
+        print('Stop:  {} Author date: {} Committer date: {}'.format(c2.hash, c2.author_date, c2.committer_date))
+
+        # Count commits to analyze
+        print('Retrieve commits to analyze.')
+        commits = []
+        for commit in RepositoryMining(self.repo_path, from_commit=last_commit, to_commit=first_commit, reversed_order=True).traverse_commits():
+            commits.append(commit)
+            print('{}) {} {}'.format(len(commits), commit.hash, commit.author_date))
+        commits_to_analyze = len(commits)
+
+        # Open CSV file and write header
         self.create_csv_file(self.csv_file)
         self.print_csv_header()
 
-        count = 0
-        print('Mining: ' + self.repo_path)
-        gr = GitRepository(self.repo_path)
-        for commit in RepositoryMining(self.repo_path, from_commit=stop_commit, to_commit=first_commit, reversed_order=True, only_modifications_with_file_types=self.allowed_extensions).traverse_commits():
+        # Traverse commits and calculate metrics
+        commit_count = 0
+        # for commit in RepositoryMining(self.repo_path, from_commit=last_commit, to_commit=first_commit, reversed_order=True, only_modifications_with_file_types=self.allowed_extensions).traverse_commits():
+        for commit in RepositoryMining(self.repo_path, from_commit=last_commit, to_commit=first_commit, reversed_order=True).traverse_commits():
             buggy = True if commit.hash in self.bic_commits else False
             fix = True if commit.hash in self.fix_commits else False
-            print('Methods: {:-8} | {:-7}/{:7} | Commit: {} Date: {} Mods: {:4} | Bug/Fix {} {}'.format(len(methods), count, commit_count, commit.hash, commit.author_date.strftime('%d/%m/%Y'), len(commit.modifications),
-                                                                                                        buggy, fix))
+            mod_count = 0
             for mod in commit.modifications:
-                if mod.filename.endswith(tuple(self.allowed_extensions)):
-                    # print('{:06}/{:06}) Commit: {} Date: {} Type: {:6} File: {}'.format(count, commit_count, commit.hash, commit.author_date.strftime('%d/%m/%Y'), mod.change_type.name, mod.filename))
-                    if mod.change_type is ModificationType.RENAME:
-                        new_methods = {}
-                        for key, value in methods.items():
-                            old_path, method = key.split('$$')
-                            if old_path == mod.new_path:
-                                key = mod.old_path + '$$' + method
-                            new_methods[key] = value
-                        methods = new_methods
+                # Filter out unnecessary files
+                if filter_files is None or mod.new_path in filter_files:
+                    if mod.filename.endswith(tuple(self.allowed_extensions)):
+                        mod_count += 1
+                        if mod.change_type is ModificationType.RENAME:
+                            methods = self.update_keys(methods, mod.new_path, mod.old_path)
+                            # new_methods = {}
+                            # for key, value in methods.items():
+                            #     old_path, method = key.split('$$')
+                            #     if old_path == mod.new_path:
+                            #         key = mod.old_path + '$$' + method
+                            #     new_methods[key] = value
+                            # methods = new_methods
+                            if filter_files is not None:
+                                filter_files.add(mod.old_path)
 
-                    for method in mod.methods:
-                        if mod.new_path is not None and mod.new_path is not '':
-                            key = mod.new_path + '$$' + method.name
-                        elif mod.old_path is not None and mod.old_path is not '':
-                            key = mod.old_path + '$$' + method.name
-                        else:
-                            key = 'unexpected_key'
+                        for method in mod.methods:
+                            key = self.get_unique_key(mod.new_path, mod.old_path, method.name)
+                            # For unwanted keys prevent metric calculation
+                            if filter_methods is None or key in filter_methods:
+                                lines = gr.parse_diff(mod.diff)
+                                method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line, lines, buggy, fix)
+                                m_touched = method_metrics.is_touched()
+                                m_fix = method_metrics.is_fix()
+                                m_buggy = method_metrics.is_buggy()
+                                mb = MinerBean(commit.hash, commit.author_date, mod.new_path, method.name, method.start_line, mod.change_type.name,
+                                               len(commit.modifications), mod.added, mod.removed, mod.nloc, mod.complexity, mod.token_count,
+                                               len(mod.methods), method_metrics.get_added_lines(), method_metrics.get_removed_lines(), method.nloc, method.complexity, method.token_count,
+                                               buggy, fix,
+                                               method_metrics.get_number_of_lines(), method.fan_in, method.fan_out, method.general_fan_out, len(method.parameters),
+                                               commit.author.email,
+                                               m_touched, m_fix, m_buggy)
+                                # Append new bean
+                                if key not in methods:
+                                    methods[key] = []
+                                methods.get(key, []).append(mb)
+                                # Going back in the past ADD is the moment in which the a file, consequently a method, is added therefore it can be removed from the disc and flushed into the CSV to save RAM
+                                if mod.change_type is ModificationType.ADD:
+                                    m = methods.pop(key, None)
+                                    if m is not None:
+                                        self.add_method_to_csv(key, m)
+                                    else:
+                                        print('Unexpected key entry: ' + key)
 
-                        # For unwanted keys prevent metric calculation
-                        if filter_methods is None or key in filter_methods:
-                            lines = gr.parse_diff(mod.diff)
-                            method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line, lines, buggy, fix)
-                            m_touched = method_metrics.is_touched()
-                            m_fix = method_metrics.is_fix()
-                            m_buggy = method_metrics.is_buggy()
-                            mb = MinerBean(commit.hash, commit.author_date, mod.new_path, method.name, method.start_line, mod.change_type.name,
-                                           len(commit.modifications), mod.added, mod.removed, mod.nloc, mod.complexity, mod.token_count,
-                                           len(mod.methods), method_metrics.get_added_lines(), method_metrics.get_removed_lines(), method.nloc, method.complexity, method.token_count,
-                                           buggy, fix,
-                                           method_metrics.get_number_of_lines(), method.fan_in, method.fan_out, method.general_fan_out, len(method.parameters),
-                                           commit.author.email,
-                                           m_touched, m_fix, m_buggy
-                                           )
-
-                            if key not in methods:
-                                methods[key] = []
-                            methods.get(key, []).append(mb)
-                            # Going back in the past ADD is the moment in which the a file, consequently a method, is added therefore it can be removed from the disc and flushed into the CSV to save RAM
-                            if mod.change_type is ModificationType.ADD:
-                                m = methods.pop(key, None)
-                                if m is not None:
-                                    self.add_method_to_csv(key, m)
-                                else:
-                                    print('This key is not present into the dict: ' + key)
-            count += 1
+            commit_count += 1
+            print('Methods: {:>8} | Commit {:>6}/{:<6} {} Date: {} Mods: {:>4}/{:<4} | Bug: {} Fix: {}'.format(len(methods), commit_count, commits_to_analyze, commit.hash, commit.author_date.strftime('%d/%m/%Y'),
+                                                                                                               len(commit.modifications), mod_count, buggy, fix))
         for key, value in methods.items():
             self.add_method_to_csv(key, value)
         self.close_csv_file()
         print('Mining ended')
         return methods
 
+    def get_unique_key(self, new_path: str, old_path: str, method_name: str) -> str:
+        if new_path is not None and new_path is not '':
+            key = new_path + '$$' + method_name
+        elif old_path is not None and old_path is not '':
+            key = old_path + '$$' + method_name
+        else:
+            key = 'unexpected_key'
+        return key
+
+    def update_keys(self, methods: Dict[str, List[MinerBean]], new_path: str, old_path: str) -> Dict[str, List[MinerBean]]:
+        new_methods = {}
+        for key, value in methods.items():
+            old_key_path, method_name = key.split('$$')
+            if old_key_path == new_path:
+                key = old_path + '$$' + method_name
+            new_methods[key] = value
+        methods.clear()  # Reduce here Python garbage collector pressure
+        del methods
+        return new_methods
+
     def create_csv_file(self, csv_path: str):
         self.out_file = open(csv_path, 'w')
 
     def print_csv_header(self):
         header = 'key,git_hash,file_name,method_name,method_start_line,file_rename_count,method_rename_count,change_type_count,' \
+ \
                  'file_count_last,file_count_max,file_count_mean,file_count_sum,' \
                  'file_added_last,file_added_max,file_added_mean,file_added_sum,' \
                  'file_removed_last,file_removed_max,file_removed_mean,file_removed_sum,' \
                  'file_nloc_last,file_nloc_max,file_nloc_mean,file_nloc_sum,' \
                  'file_comp_last,file_comp_max,file_comp_mean,file_comp_sum,' \
-                 'file_token_count_last,file_token_count_max,file_token_count_mean, file_token_count_sum,' \
+                 'file_token_count_last,file_token_count_max,file_token_count_mean,file_token_count_sum,' \
+ \
                  'method_count_last,method_count_max,method_count_mean,method_count_sum,' \
                  'method_added_last,method_added_max,method_added_mean,method_added_sum,' \
                  'method_removed_last,method_removed_max,method_removed_mean,method_removed_sum,' \
@@ -170,9 +201,12 @@ class Miner:
                  'method_fan_out_last,method_fan_out_max,method_fan_out_mean,method_fan_out_sum,' \
                  'method_general_fan_out_last,method_general_fan_out_max,method_general_fan_out_mean,method_general_fan_out_sum,' \
                  'method_parameters_counts_last,method_parameters_counts_max,method_parameters_counts_mean,method_parameters_counts_sum,' \
+ \
                  'author_email_mean,author_email_sum,' \
                  'method_touched_sum,method_touched_mean,method_fixes_sum,method_fixes_mean,' \
+ \
                  'file_buggy,file_fix,method_bug_sum,method_bug_mean,method_fix,method_buggy\n'
+        # print('Header count: {}'.format(header.count(',')))
         self.out_file.write(header)
 
     def add_method_to_csv(self, key: str, method: List[MinerBean]):
@@ -217,8 +251,8 @@ class Miner:
 
         # List of process metrics
         for n in range(0, len(method)):
-            start_time = method[n].git_commiter_date
-            stop_time = method[len(method) - 1].git_commiter_date
+            start_time = method[n].git_committer_date
+            stop_time = method[len(method) - 1].git_committer_date
             diff_time = abs(start_time - stop_time)
             if diff_time.total_seconds() < 10368000:  # Reduce analysis to 4 Months only
                 # git_hashs.append(method[n].git_hash)
@@ -346,7 +380,7 @@ class Miner:
         author_email_last = len(set(author_emails)) / len(author_emails)
         author_email_sum = len(set(author_emails))
 
-        # method_touched_last  = touches[0]
+        method_touched_last = touches[0]
         method_touched_sum = sum(touches)
         method_touched_mean = sum(touches) / len(touches)
 
@@ -357,7 +391,7 @@ class Miner:
         method_buggy_mean = sum(buggys) / len(buggys)
 
         # Append process metrics to CSV file
-        out_string = '{},{},{},{},{},{},{},' \
+        out_string = '{},{},{},{},{},{},{},{},' \
  \
                      '{},{},{},{},' \
                      '{},{},{},{},' \
@@ -407,6 +441,8 @@ class Miner:
             method_touched_sum, method_touched_mean, method_fixes_sum, method_fixes_mean,
 
             (1 if file_buggy else 0), (1 if file_fix else 0), method_buggy_sum, method_buggy_mean, (1 if method_fix else 0), (1 if method_buggy else 0))
+
+        # print('Line count: {}'.format(out_string.count(',')))
         self.out_file.write(out_string)
         self.out_file.flush()
 
