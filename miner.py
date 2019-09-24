@@ -41,13 +41,14 @@ class Miner:
         c2 = gr.get_commit(last_commit)
         print('Stop:  {} Author date: {} Committer date: {}'.format(c2.hash, c2.author_date, c2.committer_date))
 
-        # Count commits to analyze
-        print('Retrieve commits to analyze.')
-        commits = []
-        for commit in RepositoryMining(self.repo_path, from_commit=last_commit, to_commit=first_commit, reversed_order=True).traverse_commits():
-            commits.append(commit)
-            print('{}) {} {}'.format(len(commits), commit.hash, commit.author_date))
-        commits_to_analyze = len(commits)
+        # Unnecessary in production
+        # # Count commits to analyze
+        # print('Retrieve commits to analyze.')
+        # commits = []
+        # for commit in RepositoryMining(self.repo_path, from_commit=last_commit, to_commit=first_commit, reversed_order=True).traverse_commits():
+        #     commits.append(commit)
+        #     print('{}) {} {}'.format(len(commits), commit.hash, commit.author_date))
+        # commits_to_analyze = len(commits)
 
         # Open CSV file and write header
         saver = Saver(self.csv_file)
@@ -96,11 +97,6 @@ class Miner:
                                 # Going back in the past ADD is the moment in which the a file, consequently a method, is added therefore it can be removed from the disc and flushed into the CSV to save RAM
                                 if mod.change_type is ModificationType.ADD:
                                     self.flush_methods(methods, key, saver)
-                                    # m = methods.pop(key, None)
-                                    # if m is not None:
-                                    #     saver.add_method_to_csv(key, m)
-                                    # else:
-                                    #     print('Unexpected key entry: ' + key)
             commit_count += 1
             print('Methods: {:>8} | Commit {:>6}/{:<6} {} Date: {} Mods: {:>4}/{:<4} | Bug: {} Fix: {}'.format(len(methods), commit_count, commits_to_analyze, commit.hash, commit.author_date.strftime('%d/%m/%Y'),
                                                                                                                len(commit.modifications), mod_analyzed_count, buggy, fix))

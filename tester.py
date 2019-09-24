@@ -76,7 +76,7 @@ if __name__ == '__main__':
     allowed_files = set()
     for line in fin.readlines():
         cols = line.split(',')
-        touched = int(cols[78])  # Touched sum (this is a binary value since only one commit is inspected)
+        touched = int(cols[78])  # Touched sum (this is a binary value since at this point only one commit is inspected)
         if touched > 0:
             allowed_methods.add(cols[0])  # Entire key
             allowed_files.add(cols[2])  # Full paths
