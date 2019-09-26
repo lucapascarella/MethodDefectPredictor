@@ -3,7 +3,6 @@ import argparse, os, numpy
 from sklearn.preprocessing import StandardScaler
 from miner import Miner
 from sklearn.externals import joblib
-from tensorflow import keras
 import shap
 
 
@@ -17,26 +16,72 @@ def skipper(fname: str, header=False):
 
 
 def get_important_features(cutoff, shap_values):
+    # # Calculate the values that represent the fraction of the model output variability attributable
+    # # to each feature across the whole dataset.
+    # shap_sums = shap_values.sum(0)
+    # abs_shap_sums = numpy.abs(shap_values).sum(0)
+    # rel_shap_sums = abs_shap_sums / abs_shap_sums.sum()
+    #
+    # cut_off_value = cutoff * numpy.amax(rel_shap_sums)
+    #
+    # print("SHAP REL")
+    # print(rel_shap_sums)
+    # print("Length: " + str(len(rel_shap_sums)))
+    #
+    # # Get indices of features that pass the cut off value
+    # top_feature_indices = numpy.where(rel_shap_sums >= cut_off_value)[0]
+    # # Get the importance values of the top features from their indices
+    # top_features = numpy.take(rel_shap_sums, top_feature_indices)
+    # # Gets the sign of the importance from shap_sums as boolean
+    # is_positive = (numpy.take(shap_sums, top_feature_indices)) >= 0
+    # # Stack the importance, indices and shap_sums in a 2D array
+    # top_features = numpy.column_stack((top_features, top_feature_indices, is_positive))
+    # # Sort the array (in decreasing order of importance values)
+    # top_features = top_features[top_features[:, 0].argsort()][::-1]
+    #
+    # return top_features
+
     # Calculate the values that represent the fraction of the model output variability attributable
     # to each feature across the whole dataset.
-    shap_sums = shap_values.sum(0)
-    abs_shap_sums = numpy.abs(shap_values).sum(0)
-    rel_shap_sums = abs_shap_sums / abs_shap_sums.sum()
+    shap_sums = shap_values
+    abs_shap_sums = numpy.abs(shap_values)
+    rel_shap_sums = abs_shap_sums / abs_shap_sums.sum(0).sum()
 
-    cut_off_value = cutoff * numpy.amax(rel_shap_sums)
+    cut_off_value = []
+    for e in rel_shap_sums:
+        cut_off_value.append(cutoff * numpy.amax(e))
+
+    # print("SHAP REL Length: " + str(len(cut_off_value)))
+    # print(abs_shap_sums)
+    # print()
 
     # Get indices of features that pass the cut off value
-    top_feature_indices = numpy.where(rel_shap_sums >= cut_off_value)[0]
-    # Get the importance values of the top features from their indices
-    top_features = numpy.take(rel_shap_sums, top_feature_indices)
-    # Gets the sign of the importance from shap_sums as boolean
-    is_positive = (numpy.take(shap_sums, top_feature_indices)) >= 0
-    # Stack the importance, indices and shap_sums in a 2D array
-    top_features = numpy.column_stack((top_features, top_feature_indices, is_positive))
-    # Sort the array (in decreasing order of importance values)
-    top_features = top_features[top_features[:, 0].argsort()][::-1]
+    top_feature_indices = []
+    for i in range(len(cut_off_value)):
+        top_feature_indices.append(numpy.where(rel_shap_sums[i] >= cut_off_value[i])[0])
 
-    return top_features
+    top_features_list = []
+    for i in range(len(cut_off_value)):
+        # Get the importance values of the top features from their indices
+        top_features = numpy.take(rel_shap_sums[i], top_feature_indices[i])
+        # Gets the sign of the importance from shap_sums as boolean
+        is_positive = (numpy.take(shap_sums[i], top_feature_indices[i])) >= 0
+        # Stack the importance, indices and shap_sums in a 2D array
+        top_features = numpy.column_stack((top_features, top_feature_indices[i], is_positive))
+        # Sort the array (in decreasing order of importance values)
+        top_features = top_features[top_features[:, 0].argsort()][::-1]
+        top_features_list.append(top_features)
+
+    return top_features_list
+
+
+
+def build_message(file_name, method_name, top_features_name, top_features_value, i):
+    ''' TODO Working on this method to show coherent messages'''
+    feature_name = top_features_name[0][i]
+    feature_value = top_features_value[0][i]
+
+    return "{} method in {} file is prone to be defective due to {} value too high for the feature {}".format(method_name, file_name, feature_value, feature_name)
 
 
 # Main
@@ -53,6 +98,7 @@ if __name__ == '__main__':
     args, unknown = parser.parse_known_args()
 
     temp_csv = 'temp.csv'
+    temp2_csv = 'temp2.csv'
 
     if args.start is None or args.stop is None:
         print('A pair of commit HASHs must be passed as input!')
@@ -63,7 +109,7 @@ if __name__ == '__main__':
 
     # Get a list of touched methods in the last commit
     miner = Miner(args.repo, args.ext, temp_csv)
-    methods = miner.mine_methods(args.start, args.start)
+    miner.mine_methods(args.start, args.start)
 
     # Count the number of columns into which split dataset
     fin = open(temp_csv, mode='r')
@@ -84,10 +130,11 @@ if __name__ == '__main__':
     print('Check for ' + str(len(allowed_methods)) + ' methods in ' + str(len(allowed_files)) + ' files')
 
     # Calculate metrics for touched commits only up to stop commit
+    miner = Miner(args.repo, args.ext, temp2_csv)
     miner.mine_methods(args.start, args.stop, allowed_methods, allowed_files)
 
     # Read the CSV file that contains fresh mined metrics
-    dataset = numpy.loadtxt(skipper(temp_csv, True), delimiter=",", usecols=(range(5, column_count - 8)))
+    dataset = numpy.loadtxt(skipper(temp2_csv, True), delimiter=",", usecols=(range(5, column_count - 8)))
     # split into input (X) and output (Y) variables
     x = dataset[:, :]
     # Standardizing the input feature
@@ -111,30 +158,49 @@ if __name__ == '__main__':
     importance_cutoff = 0.15
     top_importances = get_important_features(importance_cutoff, shap_values)
 
-    top_indexes = [int(index) for importance, index, is_positive in top_importances]
-
-    top_1_feature = features[top_indexes[0] + 5]
-    top_2_feature = features[top_indexes[1] + 5]
-    top_3_feature = features[top_indexes[2] + 5]
-    top_4_feature = features[top_indexes[3] + 5]
-    top_5_feature = features[top_indexes[4] + 5]
+    top_features_name = ([], [], [], [], [])
+    top_features_value = ([], [], [], [], [])
+    for i in range(len(x)):
+        top_indexes = [int(index) for importance, index, is_positive in top_importances[i]]
+        top_importance = [importance for importance, index, is_positive in top_importances[i]]
+        for j in range(5):
+            if len(top_indexes) > j:
+                feature = features[top_indexes[j] + 5]
+                importance = top_importance[j]
+            else:
+                feature = "None"
+                importance = -1
+            top_features_name[j].append(feature)
+            top_features_value[j].append(importance)
 
     # Read CSV file
     defective_methods = 0
-    with open(temp_csv, mode='r') as infile:
+    with open(temp2_csv, mode='r') as infile:
         with open(args.output, mode='w') as outfile:
             header = infile.readline().strip().split(',')
-            header = ','.join(header[:-4]) + ',' + 'Prediction' + ',' + 'top_feature_1' + 'top_feature_2' + 'top_feature_3' + 'top_feature_4' + 'top_feature_5' + '\n'
+            header = ','.join(header[:-4]) + ',' + 'prediction' + ',' \
+                     + 'top_feature_1' + ',' + 'top_feature_1_val,' \
+                     + 'top_feature_2' + ',' + 'top_feature_2_val,' \
+                     + 'top_feature_3' + ',' + 'top_feature_3_val,' \
+                     + 'top_feature_4' + ',' + 'top_feature_4_val,' \
+                     + 'top_feature_5' + ',' + 'top_feature_5_val,' \
+                     + 'message' + '\n'
             outfile.write(header)
             i = 0
             lines = infile.readlines()
             for line in lines:
                 columns = line.strip().split(',')
                 if y_pred[i]:
-                    print('Commit: {} File: {} Method: {} Is: {}'.format(columns[1], columns[2], columns[3], y_pred[i]))
+                    print(build_message(columns[2], columns[3], top_features_name, top_features_value, i))
                     defective_methods += 1
                 buggy = 'TRUE' if y_pred[i] else 'FALSE'
-                outfile.write('{},{},{},{},{},{},{}\n'.format(','.join(columns[:-4]), buggy, top_1_feature, top_2_feature, top_3_feature, top_4_feature, top_5_feature))
+                outfile.write('{},{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(','.join(columns[:-4]), buggy,
+                                                                                top_features_name[0][i], top_features_value[0][i],
+                                                                                top_features_name[1][i], top_features_value[1][i],
+                                                                                top_features_name[2][i], top_features_value[2][i],
+                                                                                top_features_name[3][i], top_features_value[3][i],
+                                                                                top_features_name[4][i], top_features_value[4][i],
+                                                                                build_message(columns[2], columns[3], top_features_name, top_features_value, i)))
                 i += 1
     print('Found {} defective methods'.format(defective_methods))
 

@@ -42,13 +42,13 @@ class Miner:
         print('Stop:  {} Author date: {} Committer date: {}'.format(c2.hash, c2.author_date, c2.committer_date))
 
         # Unnecessary in production
-        # # Count commits to analyze
-        # print('Retrieve commits to analyze.')
-        # commits = []
-        # for commit in RepositoryMining(self.repo_path, from_commit=last_commit, to_commit=first_commit, reversed_order=True).traverse_commits():
-        #     commits.append(commit)
-        #     print('{}) {} {}'.format(len(commits), commit.hash, commit.author_date))
-        # commits_to_analyze = len(commits)
+        # Count commits to analyze
+        print('Retrieve commits to analyze.')
+        commits = []
+        for commit in RepositoryMining(self.repo_path, from_commit=last_commit, to_commit=first_commit, reversed_order=True).traverse_commits():
+            commits.append(commit)
+            print('{}) {} {}'.format(len(commits), commit.hash, commit.author_date))
+        commits_to_analyze = len(commits)
 
         # Open CSV file and write header
         saver = Saver(self.csv_file)
