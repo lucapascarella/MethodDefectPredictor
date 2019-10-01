@@ -16,33 +16,7 @@ def skipper(fname: str, header=False):
 
 
 def get_important_features(cutoff, shap_values):
-    # # Calculate the values that represent the fraction of the model output variability attributable
-    # # to each feature across the whole dataset.
-    # shap_sums = shap_values.sum(0)
-    # abs_shap_sums = numpy.abs(shap_values).sum(0)
-    # rel_shap_sums = abs_shap_sums / abs_shap_sums.sum()
-    #
-    # cut_off_value = cutoff * numpy.amax(rel_shap_sums)
-    #
-    # print("SHAP REL")
-    # print(rel_shap_sums)
-    # print("Length: " + str(len(rel_shap_sums)))
-    #
-    # # Get indices of features that pass the cut off value
-    # top_feature_indices = numpy.where(rel_shap_sums >= cut_off_value)[0]
-    # # Get the importance values of the top features from their indices
-    # top_features = numpy.take(rel_shap_sums, top_feature_indices)
-    # # Gets the sign of the importance from shap_sums as boolean
-    # is_positive = (numpy.take(shap_sums, top_feature_indices)) >= 0
-    # # Stack the importance, indices and shap_sums in a 2D array
-    # top_features = numpy.column_stack((top_features, top_feature_indices, is_positive))
-    # # Sort the array (in decreasing order of importance values)
-    # top_features = top_features[top_features[:, 0].argsort()][::-1]
-    #
-    # return top_features
-
-    # Calculate the values that represent the fraction of the model output variability attributable
-    # to each feature across the whole dataset.
+    # Calculate the values that represent the fraction of the model output variability attributable to each feature across the whole dataset.
     shap_sums = shap_values
     abs_shap_sums = numpy.abs(shap_values)
     rel_shap_sums = abs_shap_sums / abs_shap_sums.sum(0).sum()
@@ -51,17 +25,11 @@ def get_important_features(cutoff, shap_values):
     for e in rel_shap_sums:
         cut_off_value.append(cutoff * numpy.amax(e))
 
-    # print("SHAP REL Length: " + str(len(cut_off_value)))
-    # print(abs_shap_sums)
-    # print()
-
-    # Get indices of features that pass the cut off value
     top_feature_indices = []
-    for i in range(len(cut_off_value)):
-        top_feature_indices.append(numpy.where(rel_shap_sums[i] >= cut_off_value[i])[0])
-
     top_features_list = []
     for i in range(len(cut_off_value)):
+        # Get indices of features that pass the cut off value
+        top_feature_indices.append(numpy.where(rel_shap_sums[i] >= cut_off_value[i])[0])
         # Get the importance values of the top features from their indices
         top_features = numpy.take(rel_shap_sums[i], top_feature_indices[i])
         # Gets the sign of the importance from shap_sums as boolean
@@ -75,13 +43,20 @@ def get_important_features(cutoff, shap_values):
     return top_features_list
 
 
-
 def build_message(file_name, method_name, top_features_name, top_features_value, i):
-    ''' TODO Working on this method to show coherent messages'''
-    feature_name = top_features_name[0][i]
-    feature_value = top_features_value[0][i]
+    ''' TODO Working on this method to show coherent messages '''
+    feature_1_name = top_features_name[0][i]
+    feature_1_value = top_features_value[0][i]
+    feature_2_name = top_features_name[1][i]
+    feature_2_value = top_features_value[1][i]
+    feature_3_name = top_features_name[2][i]
+    feature_3_value = top_features_value[2][i]
+    feature_4_name = top_features_name[3][i]
+    feature_4_value = top_features_value[3][i]
+    feature_5_name = top_features_name[4][i]
+    feature_5_value = top_features_value[4][i]
 
-    return "{} method in {} file is prone to be defective due to {} value too high for the feature {}".format(method_name, file_name, feature_value, feature_name)
+    return "{} method in {} file is prone to be defective due to {} value too high for the feature {}".format(method_name, file_name, feature_1_value, feature_1_name)
 
 
 # Main
@@ -146,8 +121,8 @@ if __name__ == '__main__':
     # model = keras.models.load_model(args.model)
     # model.summary()
     model = joblib.load(args.model)
-    y_pred = model.predict(x)
-    y_pred = (y_pred > 0.5)
+    y_pred_proba = model.predict_proba(x)
+    y_pred_bin = (y_pred_proba > 0.5)
 
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(x)
@@ -178,7 +153,7 @@ if __name__ == '__main__':
     with open(temp2_csv, mode='r') as infile:
         with open(args.output, mode='w') as outfile:
             header = infile.readline().strip().split(',')
-            header = ','.join(header[:-4]) + ',' + 'prediction' + ',' \
+            header = ','.join(header[:-4]) + ',prediction,prediction_val,' \
                      + 'top_feature_1' + ',' + 'top_feature_1_val,' \
                      + 'top_feature_2' + ',' + 'top_feature_2_val,' \
                      + 'top_feature_3' + ',' + 'top_feature_3_val,' \
@@ -190,17 +165,17 @@ if __name__ == '__main__':
             lines = infile.readlines()
             for line in lines:
                 columns = line.strip().split(',')
-                if y_pred[i]:
+                if y_pred_bin[i]:
                     print(build_message(columns[2], columns[3], top_features_name, top_features_value, i))
                     defective_methods += 1
-                buggy = 'TRUE' if y_pred[i] else 'FALSE'
-                outfile.write('{},{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(','.join(columns[:-4]), buggy,
-                                                                                top_features_name[0][i], top_features_value[0][i],
-                                                                                top_features_name[1][i], top_features_value[1][i],
-                                                                                top_features_name[2][i], top_features_value[2][i],
-                                                                                top_features_name[3][i], top_features_value[3][i],
-                                                                                top_features_name[4][i], top_features_value[4][i],
-                                                                                build_message(columns[2], columns[3], top_features_name, top_features_value, i)))
+                buggy = 'TRUE' if y_pred_bin[i] else 'FALSE'
+                outfile.write('{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(','.join(columns[:-4]), buggy, y_pred_proba[i],
+                                                                                   top_features_name[0][i], top_features_value[0][i],
+                                                                                   top_features_name[1][i], top_features_value[1][i],
+                                                                                   top_features_name[2][i], top_features_value[2][i],
+                                                                                   top_features_name[3][i], top_features_value[3][i],
+                                                                                   top_features_name[4][i], top_features_value[4][i],
+                                                                                   build_message(columns[2], columns[3], top_features_name, top_features_value, i)))
                 i += 1
     print('Found {} defective methods'.format(defective_methods))
 
