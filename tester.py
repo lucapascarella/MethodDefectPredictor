@@ -121,8 +121,9 @@ if __name__ == '__main__':
     # model = keras.models.load_model(args.model)
     # model.summary()
     model = joblib.load(args.model)
+    y_pred_bin = model.predict(x)
     y_pred_proba = model.predict_proba(x)
-    y_pred_bin = (y_pred_proba > 0.5)
+    y_pred_bin = (y_pred_bin > 0.5)
 
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(x)
@@ -153,7 +154,7 @@ if __name__ == '__main__':
     with open(temp2_csv, mode='r') as infile:
         with open(args.output, mode='w') as outfile:
             header = infile.readline().strip().split(',')
-            header = ','.join(header[:-4]) + ',prediction,prediction_val,' \
+            header = ','.join(header[:-4]) + ',prediction,prediction_false,prediction_true,' \
                      + 'top_feature_1' + ',' + 'top_feature_1_val,' \
                      + 'top_feature_2' + ',' + 'top_feature_2_val,' \
                      + 'top_feature_3' + ',' + 'top_feature_3_val,' \
@@ -169,7 +170,7 @@ if __name__ == '__main__':
                     print(build_message(columns[2], columns[3], top_features_name, top_features_value, i))
                     defective_methods += 1
                 buggy = 'TRUE' if y_pred_bin[i] else 'FALSE'
-                outfile.write('{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(','.join(columns[:-4]), buggy, y_pred_proba[i],
+                outfile.write('{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(','.join(columns[:-4]), buggy, y_pred_proba[i][0],y_pred_proba[i][1],
                                                                                    top_features_name[0][i], top_features_value[0][i],
                                                                                    top_features_name[1][i], top_features_value[1][i],
                                                                                    top_features_name[2][i], top_features_value[2][i],
