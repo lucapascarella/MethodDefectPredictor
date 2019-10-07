@@ -54,5 +54,5 @@ if __name__ == '__main__':
     bic_commits = get_bic_commits(args.bic, args.bic_name)
     fix_commits = get_fix_commits(args.fix, args.fix_name)
     miner = Miner(args.repo, args.ext, args.output, bic_commits, fix_commits)
-    methods = miner.mine_methods(args.start, args.stop)
+    miner.mine_methods(args.start, args.stop)
     print("\n*** Extractor ended ***")
