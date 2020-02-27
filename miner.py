@@ -45,7 +45,7 @@ class Miner:
         # Count commits to analyze
         print('Retrieve commits to analyze.')
         commits = []
-        for commit in RepositoryMining(self.repo_path, from_commit=last_commit, to_commit=first_commit, reversed_order=True).traverse_commits():
+        for commit in RepositoryMining(self.repo_path, from_commit=first_commit, to_commit=last_commit, reversed_order=True).traverse_commits():
             commits.append(commit)
             print('{}) {} {}'.format(len(commits), commit.hash, commit.author_date))
         commits_to_analyze = len(commits)
@@ -57,8 +57,8 @@ class Miner:
 
         # Traverse commits and calculate metrics
         commit_count = 0
-        # for commit in RepositoryMining(self.repo_path, from_commit=last_commit, to_commit=first_commit, reversed_order=True, only_modifications_with_file_types=self.allowed_extensions).traverse_commits():
-        for commit in RepositoryMining(self.repo_path, from_commit=last_commit, to_commit=first_commit, reversed_order=True).traverse_commits():
+        # for commit in RepositoryMining(self.repo_path, from_commit=first_commit, to_commit=last_commit, reversed_order=True, only_modifications_with_file_types=self.allowed_extensions).traverse_commits():
+        for commit in RepositoryMining(self.repo_path, from_commit=first_commit, to_commit=last_commit, reversed_order=True).traverse_commits():
             buggy = True if commit.hash in self.bic_commits else False
             fix = True if commit.hash in self.fix_commits else False
             mod_analyzed_count = 0
