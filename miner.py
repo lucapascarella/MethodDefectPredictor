@@ -78,7 +78,7 @@ class Miner:
                             key = self.get_unique_key(mod.new_path, mod.old_path, method.name)
                             # For unwanted keys prevent metric calculation
                             if filter_methods is None or key in filter_methods:
-                                lines = gr.parse_diff(mod.diff)
+                                lines = mod.diff_parsed
                                 method_metrics = MethodMetrics(mod.source_code, method.start_line, method.end_line, lines, buggy, fix)
                                 m_touched = method_metrics.is_touched()
                                 m_fix = method_metrics.is_fix()
